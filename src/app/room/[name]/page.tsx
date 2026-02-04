@@ -30,6 +30,7 @@ export default function RoomPage({
         });
 
         const data = await res.json();
+        console.log("Room data received:", data);
 
         if (!res.ok) {
           setError(data.error || "Fehler beim Laden des Raums");
@@ -58,13 +59,19 @@ export default function RoomPage({
           router.push("/");
         });
 
+        frame.on("joined-meeting", () => {
+          console.log("Successfully joined meeting");
+          setIsJoining(false);
+        });
+
         frame.on("error", (e) => {
           console.error("Daily error:", e);
           setError("Verbindungsfehler beim Video-Call");
+          setIsJoining(false);
         });
 
+        console.log("Joining room with URL:", data.url);
         await frame.join({ url: data.url });
-        setIsJoining(false);
       } catch (err) {
         console.error("Error initializing call:", err);
         setError("Fehler beim Starten des Video-Calls");
