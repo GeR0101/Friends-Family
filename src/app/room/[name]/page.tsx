@@ -75,7 +75,17 @@ export default function RoomPage({
         });
 
         console.log("Joining room with URL:", data.url);
+        
+        // Hide loading screen after 10s timeout as fallback
+        const timeout = setTimeout(() => {
+          setIsJoining((prev) => {
+            if (prev) console.warn("Join timed out, forcing hide of loading screen");
+            return false;
+          });
+        }, 10000);
+
         await frame.join({ url: data.url });
+        clearTimeout(timeout);
       } catch (err) {
         console.error("Error initializing call:", err);
         setError("Fehler beim Starten des Video-Calls");
