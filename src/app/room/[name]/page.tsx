@@ -16,6 +16,7 @@ export default function RoomPage({
     const [isJoining, setIsJoining] = useState(false);
     const [error, setError] = useState("");
     const [copied, setCopied] = useState(false);
+    const [roomUrl, setRoomUrl] = useState("");
 
     useEffect(() => {
       if (!name || callFrameRef.current) return;
@@ -30,7 +31,6 @@ export default function RoomPage({
             body: JSON.stringify({ name }),
           });
 
-          console.log("Response status:", res.status);
           const data = await res.json();
           console.log("Room data received:", data);
 
@@ -40,6 +40,8 @@ export default function RoomPage({
             return;
           }
 
+          setRoomUrl(data.url);
+          
           if (!containerRef.current) {
             console.error("Container ref not available");
             return;
@@ -47,6 +49,7 @@ export default function RoomPage({
 
           // Create Daily iframe
           const frame = DailyIframe.createFrame(containerRef.current, {
+            url: data.url,
             showLeaveButton: true,
             showFullscreenButton: true,
             iframeStyle: {
@@ -78,7 +81,7 @@ export default function RoomPage({
           });
 
           console.log("Joining room with URL:", data.url);
-          await frame.join({ url: data.url });
+          await frame.join();
         } catch (err) {
           console.error("Error initializing call:", err);
           setError("Fehler beim Starten des Video-Calls");
