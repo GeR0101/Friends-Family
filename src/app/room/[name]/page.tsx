@@ -13,89 +13,88 @@ export default function RoomPage({
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const callFrameRef = useRef<DailyCall | null>(null);
-  const [isJoining, setIsJoining] = useState(true);
-  const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
+    const [isJoining, setIsJoining] = useState(false);
+    const [error, setError] = useState("");
+    const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!name || callFrameRef.current) return;
+    useEffect(() => {
+      if (!name || callFrameRef.current) return;
 
-    const initCall = async () => {
-      try {
-        // Create or get room via API
-        const res = await fetch("/api/rooms", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name }),
-        });
+      const initCall = async () => {
+        setIsJoining(true);
+        try {
+          console.log("Fetching room data for:", name);
+          const res = await fetch("/api/rooms", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+          });
 
-        const data = await res.json();
-        console.log("Room data received:", data);
+          console.log("Response status:", res.status);
+          const data = await res.json();
+          console.log("Room data received:", data);
 
-        if (!res.ok) {
-          setError(data.error || "Fehler beim Laden des Raums");
+          if (!res.ok) {
+            setError(data.error || "Fehler beim Laden des Raums");
+            setIsJoining(false);
+            return;
+          }
+
+          if (!containerRef.current) {
+            console.error("Container ref not available");
+            return;
+          }
+
+          // Create Daily iframe
+          const frame = DailyIframe.createFrame(containerRef.current, {
+            showLeaveButton: true,
+            showFullscreenButton: true,
+            iframeStyle: {
+              position: "absolute",
+              top: "0",
+              left: "0",
+              width: "100%",
+              height: "100%",
+              border: "none",
+              borderRadius: "0",
+            },
+          });
+
+          callFrameRef.current = frame;
+
+          frame.on("left-meeting", () => {
+            router.push("/");
+          });
+
+          frame.on("loaded", () => {
+            console.log("Daily iframe loaded");
+            setIsJoining(false);
+          });
+
+          frame.on("error", (e) => {
+            console.error("Daily error:", e);
+            setError("Verbindungsfehler beim Video-Call");
+            setIsJoining(false);
+          });
+
+          console.log("Joining room with URL:", data.url);
+          await frame.join({ url: data.url });
+        } catch (err) {
+          console.error("Error initializing call:", err);
+          setError("Fehler beim Starten des Video-Calls");
           setIsJoining(false);
-          return;
         }
+      };
 
-        // Create Daily iframe
-        const frame = DailyIframe.createFrame(containerRef.current!, {
-          showLeaveButton: true,
-          showFullscreenButton: true,
-          iframeStyle: {
-            position: "absolute",
-            top: "0",
-            left: "0",
-            width: "100%",
-            height: "100%",
-            border: "none",
-            borderRadius: "0",
-          },
-        });
+      initCall();
 
-        callFrameRef.current = frame;
-
-        frame.on("left-meeting", () => {
-          router.push("/");
-        });
-
-        frame.on("loaded", () => {
-          console.log("Daily iframe loaded");
-        });
-
-        frame.on("joined-meeting", () => {
-          console.log("Successfully joined meeting");
-        });
-
-        frame.on("error", (e) => {
-          console.error("Daily error:", e);
-          setError("Verbindungsfehler beim Video-Call");
-          setIsJoining(false);
-        });
-
-        console.log("Joining room with URL:", data.url);
-        
-        // Hide our loading screen as soon as we start joining, 
-        // Daily Prebuilt has its own loading UI
-        setIsJoining(false);
-
-        await frame.join({ url: data.url });
-      } catch (err) {
-        console.error("Error initializing call:", err);
-        setError("Fehler beim Starten des Video-Calls");
-        setIsJoining(false);
-      }
-    };
-
-    initCall();
-
-    return () => {
-      if (callFrameRef.current) {
-        callFrameRef.current.destroy();
-        callFrameRef.current = null;
-      }
-    };
-  }, [name, router]);
+      return () => {
+        if (callFrameRef.current) {
+          callFrameRef.current.destroy();
+          callFrameRef.current = null;
+        }
+      };
+    }, [name, router]);
 
   const copyLink = async () => {
     const link = window.location.href;
