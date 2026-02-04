@@ -61,7 +61,6 @@ export default function RoomPage({
 
         frame.on("loaded", () => {
           console.log("Daily iframe loaded");
-          setIsJoining(false);
         });
 
         frame.on("joined-meeting", () => {
