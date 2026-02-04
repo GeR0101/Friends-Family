@@ -51,14 +51,14 @@ export default function Home() {
           {/* Logo & Header */}
           <div className="text-center mb-8">
               <div className="flex justify-center mb-2">
-                  <Image
-                    src="/one-carbo-logo.png"
-                    alt="One Carbo"
-                    width={200}
-                    height={200}
-                    priority
-                    className="rounded-xl"
-                  />
+                    <Image
+                      src="/one-carbo-logo-full.png"
+                      alt="One Carbo"
+                      width={200}
+                      height={200}
+                      priority
+                      className="rounded-xl"
+                    />
                 </div>
                 <h1 className="text-2xl font-bold text-white mb-2">
                 Video Meeting
