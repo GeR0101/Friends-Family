@@ -7,12 +7,21 @@ import Script from "next/script";
 export const metadata: Metadata = {
   title: "One Carbo Meeting",
   description: "Video-Meeting-Tool von One Carbo - Einfach Räume erstellen und mit Partnern verbinden",
+  manifest: "/manifest.json",
   icons: {
     icon: [
       { url: "/favicon.png", type: "image/png" },
-      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
     ],
-    apple: "/favicon.png",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "OC Meeting",
   },
 };
 
