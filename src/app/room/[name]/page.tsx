@@ -125,6 +125,31 @@ export default function RoomPage({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  if (meetingEnded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] p-4">
+        <div className="text-center">
+          <Image
+            src="/one-carbo-logo.png"
+            alt="One Carbo"
+            width={80}
+            height={80}
+            className="mx-auto mb-6 rounded-xl"
+          />
+          <h2 className="text-xl font-semibold text-white mb-2">
+            Meeting beendet
+          </h2>
+          <p className="text-[#A1A1AA] mb-6">
+            Danke für deine Teilnahme!
+          </p>
+          <p className="text-[#555555] text-sm">
+            Du kannst diesen Tab jetzt schließen.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] p-4">
