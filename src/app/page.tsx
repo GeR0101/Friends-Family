@@ -82,7 +82,7 @@ export default function Home() {
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
               placeholder="z.B. partner-call oder jour-fix"
-              className="w-full px-4 py-3 border border-[#2A2A2A] rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-[#1A1A1A] text-white placeholder-[#555555] transition-all"
+              className="w-full px-4 py-3 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-green-500/50 focus:border-green-500/30 text-white placeholder-white/30 transition-all"
               onKeyDown={(e) => e.key === "Enter" && createRoom()}
             />
           </div>
