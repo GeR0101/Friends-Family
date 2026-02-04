@@ -8,7 +8,11 @@ export const metadata: Metadata = {
   title: "One Carbo Meeting",
   description: "Video-Meeting-Tool von One Carbo - Einfach Räume erstellen und mit Partnern verbinden",
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/favicon.png",
   },
 };
 
