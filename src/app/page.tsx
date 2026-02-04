@@ -52,7 +52,7 @@ export default function Home() {
           <div className="text-center mb-8">
               <div className="flex justify-center mb-2">
                     <Image
-                      src="/one-carbo-logo-full.png"
+                      src="/one-carbo-logo-white.png"
                       alt="One Carbo"
                       width={200}
                       height={200}
