@@ -141,22 +141,22 @@ export default function Home() {
             )}
           </button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#2A2A2A]" />
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-3 text-white/30">
+                  oder
+                </span>
+              </div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-[#141414] text-[#555555]">
-                oder
-              </span>
-            </div>
-          </div>
 
-          <button
-            onClick={joinRoom}
-            disabled={isLoading || !roomName.trim()}
-            className="w-full py-3 px-4 border border-[#2A2A2A] hover:border-green-500/50 hover:bg-green-900/10 disabled:border-[#1A1A1A] disabled:text-[#444444] text-[#A1A1AA] font-medium rounded-xl transition-all flex items-center justify-center gap-2"
-          >
+            <button
+              onClick={joinRoom}
+              disabled={isLoading || !roomName.trim()}
+              className="w-full py-3 px-4 backdrop-blur-sm bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 disabled:bg-white/5 disabled:border-white/5 disabled:text-white/20 text-white/70 font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+            >
             <svg
               className="w-5 h-5"
               fill="none"
