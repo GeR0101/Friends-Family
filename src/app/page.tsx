@@ -50,25 +50,25 @@ export default function Home() {
       <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 via-transparent to-green-900/10 pointer-events-none" />
       
       <main className="relative w-full max-w-md bg-[#141414] border border-[#2A2A2A] rounded-2xl shadow-2xl shadow-green-900/10 p-8">
-        {/* Logo & Header */}
-        <div className="text-center mb-8">
-            <div className="flex justify-center mb-6">
-              <Image
-                src="/one-carbo-logo.png"
-                alt="One Carbo"
-                width={120}
-                height={120}
-                priority
-                className="rounded-xl"
-              />
+          {/* Logo & Header */}
+          <div className="text-center mb-8">
+              <div className="flex justify-center mb-4">
+                <Image
+                  src="/one-carbo-logo.png"
+                  alt="One Carbo"
+                  width={200}
+                  height={200}
+                  priority
+                  className="rounded-xl"
+                />
               </div>
-            <h1 className="text-2xl font-bold text-white mb-2">
-              One Carbo Video Meeting
-            </h1>
-            <p className="text-[#A1A1AA]">
-              Erstelle einen Raum oder tritt einem bei
-            </p>
-        </div>
+              <h1 className="text-2xl font-bold text-white mb-2">
+                Video Meeting
+              </h1>
+              <p className="text-[#A1A1AA]">
+                Erstelle einen Raum oder tritt einem bei
+              </p>
+          </div>
 
         <div className="space-y-4">
           <div>
