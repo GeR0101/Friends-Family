@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: "One Carbo Meeting",
   description: "Video-Meeting-Tool von One Carbo - Einfach Räume erstellen und mit Partnern verbinden",
   icons: {
-    icon: "/favicon.svg",
+    icon: "/favicon.png",
   },
 };
 
