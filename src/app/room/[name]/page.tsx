@@ -152,86 +152,65 @@ export default function RoomPage({
     );
   }
 
-  return (
-    <div className="relative min-h-screen bg-[#0A0A0A]">
-      {/* Header with room info */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-[#0A0A0A] to-transparent p-4">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push("/")}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <svg
-                className="w-5 h-5 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-            </button>
-            <Image
+    return (
+      <div className="relative min-h-screen bg-[#0A0A0A]">
+        {/* Footer with room info */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-[#0A0A0A] to-transparent p-3">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div className="flex items-center gap-2">
+              <Image
                 src="/one-carbo-logo.png"
                 alt="One Carbo"
-                width={40}
-                height={40}
-                className="hidden sm:block rounded-lg"
+                width={32}
+                height={32}
+                className="rounded-lg"
               />
-            <div className="sm:border-l sm:border-[#2A2A2A] sm:pl-3 sm:ml-1">
-              <h1 className="text-white font-medium">{decodeURIComponent(name)}</h1>
-              <p className="text-[#555555] text-sm">Video Meeting</p>
+              <span className="text-white text-sm font-medium">{decodeURIComponent(name)}</span>
             </div>
-          </div>
 
-          <button
-            onClick={copyLink}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
-          >
-            {copied ? (
-              <>
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                Kopiert!
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Link teilen</span>
-                <span className="sm:hidden">Teilen</span>
-              </>
-            )}
-          </button>
+            <button
+              onClick={copyLink}
+              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-sm rounded-lg transition-colors"
+            >
+              {copied ? (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  Kopiert!
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">Link teilen</span>
+                  <span className="sm:hidden">Teilen</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* Loading state */}
       {isJoining && (
