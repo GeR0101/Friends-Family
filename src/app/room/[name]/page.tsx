@@ -182,7 +182,7 @@ export default function RoomPage({
                 className="hidden sm:block rounded-lg"
               />
             <div className="sm:border-l sm:border-[#2A2A2A] sm:pl-3 sm:ml-1">
-              <h1 className="text-white font-medium">{name}</h1>
+              <h1 className="text-white font-medium">{decodeURIComponent(name)}</h1>
               <p className="text-[#555555] text-sm">Video Meeting</p>
             </div>
           </div>
