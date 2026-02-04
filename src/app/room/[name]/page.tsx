@@ -165,7 +165,7 @@ export default function RoomPage({
                   height={32}
                   className="rounded-lg"
                 />
-                <span className="text-white text-sm font-medium">{decodeURIComponent(name)}</span>
+                <span className="text-white text-sm font-medium">{decodeURIComponent(name).toUpperCase()}</span>
               </div>
 
               <button
