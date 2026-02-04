@@ -153,25 +153,31 @@ export default function Home() {
             </div>
 
             <button
-              onClick={joinRoom}
-              disabled={isLoading || !roomName.trim()}
-              className="w-full py-3 px-4 backdrop-blur-sm bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 disabled:bg-white/5 disabled:border-white/5 disabled:text-white/20 text-white/70 font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+              onClick={() => router.push("/room/sauna")}
+              disabled={isLoading}
+              className="w-full py-3 px-4 backdrop-blur-sm bg-orange-500/20 border border-orange-500/30 hover:bg-orange-500/30 hover:border-orange-500/40 text-orange-300 font-medium rounded-xl transition-all flex items-center justify-center gap-2"
             >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-              />
-            </svg>
-            Bestehendem Raum beitreten
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"
+                />
+              </svg>
+              Ab in die Sauna
+            </button>
         </div>
 
           <div className="mt-8 p-4 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl">
