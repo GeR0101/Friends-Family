@@ -155,7 +155,7 @@ export default function RoomPage({
       return (
         <div className="relative min-h-screen bg-[#0A0A0A]">
           {/* Footer with room info */}
-          <div className="absolute bottom-4 left-4 right-4 z-10">
+          <div className="absolute bottom-20 left-4 right-4 z-10">
             <div className="flex items-center justify-between max-w-7xl mx-auto backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl px-4 py-2">
               <div className="flex items-center gap-2">
                 <Image
