@@ -5,8 +5,11 @@ import ErrorReporter from "@/components/ErrorReporter";
 import Script from "next/script";
 
 export const metadata: Metadata = {
-  title: "One Carbo - Video Meeting",
-  description: "Einfaches Video-Meeting-Tool für Jour Fixe und Team-Meetings",
+  title: "One Carbo Meeting",
+  description: "Video-Meeting-Tool von One Carbo - Einfach Räume erstellen und mit Partnern verbinden",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
