@@ -101,8 +101,26 @@ export default function RoomPage({
 
   const copyLink = async () => {
     const link = window.location.href;
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      // Fallback for iframe/secure context restrictions
+      const textArea = document.createElement("textarea");
+      textArea.value = link;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        setCopied(true);
+      } catch {
+        // If all else fails, show prompt with link
+        window.prompt("Link kopieren:", link);
+      }
+      document.body.removeChild(textArea);
+    }
     setTimeout(() => setCopied(false), 2000);
   };
 
