@@ -152,26 +152,26 @@ export default function RoomPage({
     );
   }
 
-    return (
-      <div className="relative min-h-screen bg-[#0A0A0A]">
-        {/* Footer with room info */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-[#0A0A0A] to-transparent p-3">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div className="flex items-center gap-2">
-              <Image
-                src="/one-carbo-logo.png"
-                alt="One Carbo"
-                width={32}
-                height={32}
-                className="rounded-lg"
-              />
-              <span className="text-white text-sm font-medium">{decodeURIComponent(name)}</span>
-            </div>
+      return (
+        <div className="relative min-h-screen bg-[#0A0A0A]">
+          {/* Footer with room info */}
+          <div className="absolute bottom-4 left-4 right-4 z-10">
+            <div className="flex items-center justify-between max-w-7xl mx-auto backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl px-4 py-2">
+              <div className="flex items-center gap-2">
+                <Image
+                  src="/one-carbo-logo.png"
+                  alt="One Carbo"
+                  width={32}
+                  height={32}
+                  className="rounded-lg"
+                />
+                <span className="text-white text-sm font-medium">{decodeURIComponent(name)}</span>
+              </div>
 
-            <button
-              onClick={copyLink}
-              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-sm rounded-lg transition-colors"
-            >
+              <button
+                onClick={copyLink}
+                className="flex items-center gap-2 px-3 py-1.5 backdrop-blur-sm bg-green-600/80 hover:bg-green-500/90 border border-green-500/30 text-white text-sm rounded-lg transition-colors"
+              >
               {copied ? (
                 <>
                   <svg
