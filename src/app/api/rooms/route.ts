@@ -12,7 +12,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const roomName = body.name || generateRoomName();
+    const rawName = body.name || generateRoomName();
+    // Sanitize room name: lowercase, replace spaces/special chars with dashes, remove invalid chars
+    const roomName = rawName
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[äöüß]/g, (c: string) => ({ ä: "ae", ö: "oe", ü: "ue", ß: "ss" }[c] || c))
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 64) || generateRoomName();
 
     // First check if room already exists
     const checkRes = await fetch(`https://api.daily.co/v1/rooms/${roomName}`, {
