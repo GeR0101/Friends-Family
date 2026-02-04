@@ -152,10 +152,10 @@ export default function RoomPage({
     );
   }
 
-        return (
-          <div className="relative min-h-screen bg-[#0A0A0A]">
-            {/* Footer with room info - compact on mobile */}
-            <div className="absolute bottom-20 sm:bottom-20 left-2 sm:left-4 right-auto z-10">
+          return (
+            <div className="relative min-h-screen bg-[#0A0A0A]">
+              {/* Footer with room info - compact on mobile */}
+              <div className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-4 right-auto z-10">
               <div className="flex items-center gap-2 sm:gap-3 backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl px-2 sm:px-4 py-1.5 sm:py-2">
                   <Image
                     src="/one-carbo-logo.png"
