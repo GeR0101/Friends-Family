@@ -156,14 +156,14 @@ export default function RoomPage({
             <div className="relative min-h-screen bg-[#0A0A0A]">
               {/* Footer with room info - compact on mobile */}
               <div className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-4 right-auto z-10">
-              <div className="flex items-center gap-2 sm:gap-3 backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl px-2 sm:px-4 py-1.5 sm:py-2">
-                  <Image
-                    src="/one-carbo-logo.png"
-                    alt="One Carbo"
-                    width={32}
-                    height={32}
-                    className="rounded-lg sm:w-12 sm:h-12"
-                  />
+                <div className="flex items-center gap-2 sm:gap-3 backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl px-2 sm:px-4 py-1.5 sm:py-2">
+                    <Image
+                      src="/one-carbo-logo-black.png"
+                      alt="One Carbo"
+                      width={32}
+                      height={32}
+                      className="rounded-lg sm:w-12 sm:h-12"
+                    />
                   <span className="text-white text-xs sm:text-base font-medium hidden sm:inline">{decodeURIComponent(name).toUpperCase()}</span>
                 <button
                   onClick={copyLink}
