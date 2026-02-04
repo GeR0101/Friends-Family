@@ -59,9 +59,13 @@ export default function RoomPage({
           router.push("/");
         });
 
+        frame.on("loaded", () => {
+          console.log("Daily iframe loaded");
+          setIsJoining(false);
+        });
+
         frame.on("joined-meeting", () => {
           console.log("Successfully joined meeting");
-          setIsJoining(false);
         });
 
         frame.on("error", (e) => {
