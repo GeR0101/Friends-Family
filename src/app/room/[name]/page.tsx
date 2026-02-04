@@ -222,6 +222,19 @@ export default function RoomPage({
             <p className="text-gray-400 text-sm mt-2">
               Bitte erlaube den Kamera- und Mikrofonzugriff
             </p>
+            {roomUrl && (
+              <div className="mt-8 pt-8 border-t border-white/10">
+                <p className="text-gray-500 text-xs mb-2">Lädt nicht? Probiere den direkten Link:</p>
+                <a 
+                  href={roomUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 text-sm underline"
+                >
+                  Raum in neuem Tab öffnen
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}
