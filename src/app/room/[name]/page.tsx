@@ -170,7 +170,7 @@ export default function RoomPage({
 
               <button
                 onClick={copyLink}
-                className="flex items-center gap-2 px-3 py-1.5 backdrop-blur-sm bg-green-600/80 hover:bg-green-500/90 border border-green-500/30 text-white text-sm rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-black hover:bg-zinc-900 text-white text-sm font-medium rounded-lg transition-colors shadow-lg"
               >
               {copied ? (
                 <>
