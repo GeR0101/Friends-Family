@@ -46,20 +46,22 @@ export default function RoomPage({
           return;
         }
 
-        const frame = DailyIframe.createFrame(containerRef.current, {
-          url: data.url,
-          showLeaveButton: true,
-          showFullscreenButton: true,
-          iframeStyle: {
-            position: "absolute",
-            top: "0",
-            left: "0",
-            width: "100%",
-            height: "100%",
-            border: "none",
-            borderRadius: "0",
-          },
-        });
+          const frame = DailyIframe.createFrame(containerRef.current, {
+            url: data.url,
+            showLeaveButton: true,
+            showFullscreenButton: true,
+            startVideoOff: false,
+            startAudioOff: false,
+            iframeStyle: {
+              position: "absolute",
+              top: "0",
+              left: "0",
+              width: "100%",
+              height: "100%",
+              border: "none",
+              borderRadius: "0",
+            },
+          });
 
         callFrameRef.current = frame;
 
