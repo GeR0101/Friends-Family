@@ -164,7 +164,7 @@ export default function RoomPage({
                       height={32}
                       className="rounded-lg sm:w-12 sm:h-12"
                     />
-                  <span className="text-white text-xs sm:text-base font-medium hidden sm:inline">{decodeURIComponent(name).toUpperCase()}</span>
+                    <span className="text-black text-xs sm:text-base font-medium hidden sm:inline">{decodeURIComponent(name).toUpperCase()}</span>
                 <button
                   onClick={copyLink}
                   className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 bg-black hover:bg-zinc-900 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors shadow-lg"
