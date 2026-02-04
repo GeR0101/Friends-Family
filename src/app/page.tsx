@@ -44,12 +44,10 @@ export default function Home() {
     router.push(`/room/${roomName.trim()}`);
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] p-4">
-      {/* Background gradient effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 via-transparent to-green-900/10 pointer-events-none" />
-      
-      <main className="relative w-full max-w-md bg-[#141414] border border-[#2A2A2A] rounded-2xl shadow-2xl shadow-green-900/10 p-8">
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] p-4">
+        
+        <main className="relative w-full max-w-md backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl p-8">
           {/* Logo & Header */}
           <div className="text-center mb-8">
               <div className="flex justify-center mb-4">
