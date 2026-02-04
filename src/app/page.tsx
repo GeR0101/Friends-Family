@@ -174,27 +174,27 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="mt-8 p-4 bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl">
-          <h3 className="font-medium text-white mb-2 flex items-center gap-2">
-            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            So funktioniert&apos;s:
-          </h3>
-          <ol className="text-sm text-[#A1A1AA] space-y-1 list-decimal list-inside">
-            <li>Gib einen Raumnamen ein (z.B. &quot;partner-call&quot;)</li>
-            <li>Klicke auf &quot;Neuen Raum erstellen&quot;</li>
-            <li>Teile den Link mit deinen Partnern</li>
-            <li>Der Raum bleibt dauerhaft bestehen</li>
-          </ol>
-        </div>
+          <div className="mt-8 p-4 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl">
+            <h3 className="font-medium text-white mb-2 flex items-center gap-2">
+              <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              So funktioniert&apos;s:
+            </h3>
+            <ol className="text-sm text-white/50 space-y-1 list-decimal list-inside">
+              <li>Gib einen Raumnamen ein (z.B. &quot;partner-call&quot;)</li>
+              <li>Klicke auf &quot;Neuen Raum erstellen&quot;</li>
+              <li>Teile den Link mit deinen Partnern</li>
+              <li>Der Raum bleibt dauerhaft bestehen</li>
+            </ol>
+          </div>
 
-        {/* Footer */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-[#555555]">
-            Powered by One Carbo
-          </p>
-        </div>
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-xs text-white/30">
+              Powered by One Carbo
+            </p>
+          </div>
       </main>
     </div>
   );
