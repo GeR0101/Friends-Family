@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function Home() {
   const router = useRouter();
@@ -44,28 +45,26 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <main className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+    <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] p-4">
+      {/* Background gradient effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 via-transparent to-green-900/10 pointer-events-none" />
+      
+      <main className="relative w-full max-w-md bg-[#141414] border border-[#2A2A2A] rounded-2xl shadow-2xl shadow-green-900/10 p-8">
+        {/* Logo & Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo.svg"
+              alt="One Carbo"
+              width={180}
+              height={45}
+              priority
+            />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-2xl font-bold text-white mb-2">
             Video Meeting
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-[#A1A1AA]">
             Erstelle einen Raum oder tritt einem bei
           </p>
         </div>
@@ -74,7 +73,7 @@ export default function Home() {
           <div>
             <label
               htmlFor="roomName"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              className="block text-sm font-medium text-[#A1A1AA] mb-2"
             >
               Raumname (optional)
             </label>
@@ -83,14 +82,14 @@ export default function Home() {
               type="text"
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
-              placeholder="z.B. team-standup oder jour-fix"
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
+              placeholder="z.B. partner-call oder jour-fix"
+              className="w-full px-4 py-3 border border-[#2A2A2A] rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-[#1A1A1A] text-white placeholder-[#555555] transition-all"
               onKeyDown={(e) => e.key === "Enter" && createRoom()}
             />
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-400 text-sm">
+            <div className="p-3 bg-red-900/20 border border-red-800/50 rounded-xl text-red-400 text-sm">
               {error}
             </div>
           )}
@@ -98,7 +97,7 @@ export default function Home() {
           <button
             onClick={createRoom}
             disabled={isLoading}
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:opacity-50 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-900/30"
           >
             {isLoading ? (
               <>
@@ -135,7 +134,7 @@ export default function Home() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M12 4v16m8-8H4"
+                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                   />
                 </svg>
                 Neuen Raum erstellen
@@ -145,10 +144,10 @@ export default function Home() {
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-gray-600" />
+              <div className="w-full border-t border-[#2A2A2A]" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
+              <span className="px-3 bg-[#141414] text-[#555555]">
                 oder
               </span>
             </div>
@@ -157,7 +156,7 @@ export default function Home() {
           <button
             onClick={joinRoom}
             disabled={isLoading || !roomName.trim()}
-            className="w-full py-3 px-4 border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-500 disabled:border-gray-200 disabled:text-gray-400 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 border border-[#2A2A2A] hover:border-green-500/50 hover:bg-green-900/10 disabled:border-[#1A1A1A] disabled:text-[#444444] text-[#A1A1AA] font-medium rounded-xl transition-all flex items-center justify-center gap-2"
           >
             <svg
               className="w-5 h-5"
@@ -176,16 +175,26 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-          <h3 className="font-medium text-gray-900 dark:text-white mb-2">
+        <div className="mt-8 p-4 bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl">
+          <h3 className="font-medium text-white mb-2 flex items-center gap-2">
+            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             So funktioniert&apos;s:
           </h3>
-          <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1 list-decimal list-inside">
-            <li>Gib einen Raumnamen ein (z.B. &quot;team-meeting&quot;)</li>
+          <ol className="text-sm text-[#A1A1AA] space-y-1 list-decimal list-inside">
+            <li>Gib einen Raumnamen ein (z.B. &quot;partner-call&quot;)</li>
             <li>Klicke auf &quot;Neuen Raum erstellen&quot;</li>
-            <li>Teile den Link mit deinen Freunden</li>
+            <li>Teile den Link mit deinen Partnern</li>
             <li>Der Raum bleibt dauerhaft bestehen</li>
           </ol>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 text-center">
+          <p className="text-xs text-[#555555]">
+            Powered by One Carbo
+          </p>
         </div>
       </main>
     </div>
