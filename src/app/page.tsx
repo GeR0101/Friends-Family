@@ -88,10 +88,10 @@ export default function Home() {
           </div>
 
           {error && (
-            <div className="p-3 bg-red-900/20 border border-red-800/50 rounded-xl text-red-400 text-sm">
-              {error}
-            </div>
-          )}
+              <div className="p-3 backdrop-blur-sm bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                {error}
+              </div>
+            )}
 
           <button
             onClick={createRoom}
