@@ -157,16 +157,16 @@ export default function RoomPage({
           {/* Footer with room info */}
           <div className="absolute bottom-20 left-4 right-4 z-10">
             <div className="flex items-center justify-between max-w-7xl mx-auto backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl px-4 py-2">
-              <div className="flex items-center gap-2">
-                <Image
-                  src="/one-carbo-logo.png"
-                  alt="One Carbo"
-                  width={32}
-                  height={32}
-                  className="rounded-lg"
-                />
-                <span className="text-white text-sm font-medium">{decodeURIComponent(name).toUpperCase()}</span>
-              </div>
+                <div className="flex items-center gap-3">
+                  <Image
+                    src="/one-carbo-logo.png"
+                    alt="One Carbo"
+                    width={48}
+                    height={48}
+                    className="rounded-lg"
+                  />
+                  <span className="text-white font-medium">{decodeURIComponent(name).toUpperCase()}</span>
+                </div>
 
               <button
                 onClick={copyLink}
