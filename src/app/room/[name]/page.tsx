@@ -235,13 +235,13 @@ export default function RoomPage({
       {isJoining && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#0A0A0A] z-20">
           <div className="text-center">
-            <Image
-              src="/logo.svg"
-              alt="One Carbo"
-              width={160}
-              height={40}
-              className="mx-auto mb-8"
-            />
+<Image
+                src="/one-carbo-logo.png"
+                alt="One Carbo"
+                width={60}
+                height={60}
+                className="mx-auto mb-8 rounded-xl"
+              />
             <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-white text-lg">Verbinde mit {name}...</p>
             <p className="text-[#555555] text-sm mt-2">
