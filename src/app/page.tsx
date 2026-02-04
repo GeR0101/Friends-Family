@@ -61,13 +61,13 @@ export default function Home() {
                 priority
                 className="rounded-xl"
               />
-            </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
-            Video Meeting
-          </h1>
-          <p className="text-[#A1A1AA]">
-            Erstelle einen Raum oder tritt einem bei
-          </p>
+              </div>
+            <h1 className="text-2xl font-bold text-white mb-2">
+              One Carbo Video Meeting
+            </h1>
+            <p className="text-[#A1A1AA]">
+              Erstelle einen Raum oder tritt einem bei
+            </p>
         </div>
 
         <div className="space-y-4">
