@@ -64,8 +64,8 @@ export default function Home() {
                 Video Meeting
               </h1>
               <p className="text-[#A1A1AA]">
-                Erstelle einen Raum oder tritt einem bei
-              </p>
+                  Erstelle einen Raum oder Ab in die Sauna
+                </p>
           </div>
 
         <div className="space-y-4">
