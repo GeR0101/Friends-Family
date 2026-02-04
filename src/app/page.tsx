@@ -96,7 +96,7 @@ export default function Home() {
           <button
             onClick={createRoom}
             disabled={isLoading}
-            className="w-full py-3 px-4 bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:opacity-50 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-900/30"
+            className="w-full py-3 px-4 backdrop-blur-sm bg-green-600/80 hover:bg-green-500/90 disabled:bg-green-800/50 disabled:opacity-50 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 border border-green-500/30"
           >
             {isLoading ? (
               <>
