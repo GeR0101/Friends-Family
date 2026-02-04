@@ -52,15 +52,16 @@ export default function Home() {
       <main className="relative w-full max-w-md bg-[#141414] border border-[#2A2A2A] rounded-2xl shadow-2xl shadow-green-900/10 p-8">
         {/* Logo & Header */}
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-6">
-            <Image
-              src="/logo.svg"
-              alt="One Carbo"
-              width={180}
-              height={45}
-              priority
-            />
-          </div>
+            <div className="flex justify-center mb-6">
+              <Image
+                src="/one-carbo-logo.png"
+                alt="One Carbo"
+                width={120}
+                height={120}
+                priority
+                className="rounded-xl"
+              />
+            </div>
           <h1 className="text-2xl font-bold text-white mb-2">
             Video Meeting
           </h1>
