@@ -243,7 +243,7 @@ export default function RoomPage({
                 className="mx-auto mb-8 rounded-xl"
               />
             <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-white text-lg">Verbinde mit {name}...</p>
+            <p className="text-white text-lg">Verbinde mit {decodeURIComponent(name)}...</p>
             <p className="text-[#555555] text-sm mt-2">
               Bitte erlaube den Kamera- und Mikrofonzugriff
             </p>
