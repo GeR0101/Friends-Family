@@ -176,7 +176,7 @@ export default function Home() {
                   d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"
                 />
               </svg>
-              Ab in die Sauna
+              Ab in die SAUNA
             </button>
         </div>
 
