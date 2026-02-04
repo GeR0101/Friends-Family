@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, use } from "react";
 import DailyIframe, { DailyCall } from "@daily-co/daily-js";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function RoomPage({
   params,
@@ -13,91 +14,84 @@ export default function RoomPage({
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const callFrameRef = useRef<DailyCall | null>(null);
-    const [isJoining, setIsJoining] = useState(false);
-    const [error, setError] = useState("");
-    const [copied, setCopied] = useState(false);
-    const [roomUrl, setRoomUrl] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [roomUrl, setRoomUrl] = useState("");
 
-    useEffect(() => {
-      if (!name || callFrameRef.current) return;
+  useEffect(() => {
+    if (!name || callFrameRef.current) return;
 
-      const initCall = async () => {
-        setIsJoining(true);
-        try {
-          console.log("Fetching room data for:", name);
-          const res = await fetch("/api/rooms", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name }),
-          });
+    const initCall = async () => {
+      setIsJoining(true);
+      try {
+        const res = await fetch("/api/rooms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
 
-          const data = await res.json();
-          console.log("Room data received:", data);
+        const data = await res.json();
 
-          if (!res.ok) {
-            setError(data.error || "Fehler beim Laden des Raums");
-            setIsJoining(false);
-            return;
-          }
-
-          setRoomUrl(data.url);
-          
-          if (!containerRef.current) {
-            console.error("Container ref not available");
-            return;
-          }
-
-          // Create Daily iframe
-          const frame = DailyIframe.createFrame(containerRef.current, {
-            url: data.url,
-            showLeaveButton: true,
-            showFullscreenButton: true,
-            iframeStyle: {
-              position: "absolute",
-              top: "0",
-              left: "0",
-              width: "100%",
-              height: "100%",
-              border: "none",
-              borderRadius: "0",
-            },
-          });
-
-          callFrameRef.current = frame;
-
-          frame.on("left-meeting", () => {
-            router.push("/");
-          });
-
-          frame.on("loaded", () => {
-            console.log("Daily iframe loaded");
-            setIsJoining(false);
-          });
-
-          frame.on("error", (e) => {
-            console.error("Daily error:", e);
-            setError("Verbindungsfehler beim Video-Call");
-            setIsJoining(false);
-          });
-
-          console.log("Joining room with URL:", data.url);
-          await frame.join();
-        } catch (err) {
-          console.error("Error initializing call:", err);
-          setError("Fehler beim Starten des Video-Calls");
+        if (!res.ok) {
+          setError(data.error || "Fehler beim Laden des Raums");
           setIsJoining(false);
+          return;
         }
-      };
 
-      initCall();
-
-      return () => {
-        if (callFrameRef.current) {
-          callFrameRef.current.destroy();
-          callFrameRef.current = null;
+        setRoomUrl(data.url);
+        
+        if (!containerRef.current) {
+          console.error("Container ref not available");
+          return;
         }
-      };
-    }, [name, router]);
+
+        const frame = DailyIframe.createFrame(containerRef.current, {
+          url: data.url,
+          showLeaveButton: true,
+          showFullscreenButton: true,
+          iframeStyle: {
+            position: "absolute",
+            top: "0",
+            left: "0",
+            width: "100%",
+            height: "100%",
+            border: "none",
+            borderRadius: "0",
+          },
+        });
+
+        callFrameRef.current = frame;
+
+        frame.on("left-meeting", () => {
+          router.push("/");
+        });
+
+        frame.on("loaded", () => {
+          setIsJoining(false);
+        });
+
+        frame.on("error", () => {
+          setError("Verbindungsfehler beim Video-Call");
+          setIsJoining(false);
+        });
+
+        await frame.join();
+      } catch {
+        setError("Fehler beim Starten des Video-Calls");
+        setIsJoining(false);
+      }
+    };
+
+    initCall();
+
+    return () => {
+      if (callFrameRef.current) {
+        callFrameRef.current.destroy();
+        callFrameRef.current = null;
+      }
+    };
+  }, [name, router]);
 
   const copyLink = async () => {
     const link = window.location.href;
@@ -105,7 +99,6 @@ export default function RoomPage({
       await navigator.clipboard.writeText(link);
       setCopied(true);
     } catch {
-      // Fallback for iframe/secure context restrictions
       const textArea = document.createElement("textarea");
       textArea.value = link;
       textArea.style.position = "fixed";
@@ -116,7 +109,6 @@ export default function RoomPage({
         document.execCommand("copy");
         setCopied(true);
       } catch {
-        // If all else fails, show prompt with link
         window.prompt("Link kopieren:", link);
       }
       document.body.removeChild(textArea);
@@ -126,7 +118,7 @@ export default function RoomPage({
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-900 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] p-4">
         <div className="text-center">
           <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
@@ -146,10 +138,10 @@ export default function RoomPage({
           <h2 className="text-xl font-semibold text-white mb-2">
             Fehler aufgetreten
           </h2>
-          <p className="text-gray-400 mb-4">{error}</p>
+          <p className="text-[#A1A1AA] mb-4">{error}</p>
           <button
             onClick={() => router.push("/")}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
           >
             Zurück zur Startseite
           </button>
@@ -159,9 +151,9 @@ export default function RoomPage({
   }
 
   return (
-    <div className="relative min-h-screen bg-gray-900">
+    <div className="relative min-h-screen bg-[#0A0A0A]">
       {/* Header with room info */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-gray-900 to-transparent p-4">
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-[#0A0A0A] to-transparent p-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             <button
@@ -182,15 +174,22 @@ export default function RoomPage({
                 />
               </svg>
             </button>
-            <div>
+            <Image
+              src="/logo.svg"
+              alt="One Carbo"
+              width={120}
+              height={30}
+              className="hidden sm:block"
+            />
+            <div className="sm:border-l sm:border-[#2A2A2A] sm:pl-3 sm:ml-1">
               <h1 className="text-white font-medium">{name}</h1>
-              <p className="text-gray-400 text-sm">Video Meeting</p>
+              <p className="text-[#555555] text-sm">Video Meeting</p>
             </div>
           </div>
 
           <button
             onClick={copyLink}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
           >
             {copied ? (
               <>
@@ -207,7 +206,7 @@ export default function RoomPage({
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                Link kopiert!
+                Kopiert!
               </>
             ) : (
               <>
@@ -224,7 +223,8 @@ export default function RoomPage({
                     d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
                   />
                 </svg>
-                Link teilen
+                <span className="hidden sm:inline">Link teilen</span>
+                <span className="sm:hidden">Teilen</span>
               </>
             )}
           </button>
@@ -233,21 +233,28 @@ export default function RoomPage({
 
       {/* Loading state */}
       {isJoining && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
+        <div className="absolute inset-0 flex items-center justify-center bg-[#0A0A0A] z-20">
           <div className="text-center">
-            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <Image
+              src="/logo.svg"
+              alt="One Carbo"
+              width={160}
+              height={40}
+              className="mx-auto mb-8"
+            />
+            <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-white text-lg">Verbinde mit {name}...</p>
-            <p className="text-gray-400 text-sm mt-2">
+            <p className="text-[#555555] text-sm mt-2">
               Bitte erlaube den Kamera- und Mikrofonzugriff
             </p>
             {roomUrl && (
-              <div className="mt-8 pt-8 border-t border-white/10">
-                <p className="text-gray-500 text-xs mb-2">Lädt nicht? Probiere den direkten Link:</p>
+              <div className="mt-8 pt-8 border-t border-[#2A2A2A]">
+                <p className="text-[#444444] text-xs mb-2">Lädt nicht? Probiere den direkten Link:</p>
                 <a 
                   href={roomUrl} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 text-sm underline"
+                  className="text-green-500 hover:text-green-400 text-sm underline"
                 >
                   Raum in neuem Tab öffnen
                 </a>
