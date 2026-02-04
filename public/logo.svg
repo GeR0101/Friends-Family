@@ -1,0 +1,18 @@
+<svg width="200" height="50" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Stylized carbon/leaf icon -->
+  <g>
+    <!-- Outer leaf shape -->
+    <path d="M12 8C12 8 8 16 8 24C8 32 12 40 20 44C28 40 32 32 32 24C32 16 28 8 28 8C28 8 24 12 20 12C16 12 12 8 12 8Z" fill="#22C55E"/>
+    <!-- Inner carbon dots -->
+    <circle cx="16" cy="24" r="2" fill="#0A0A0A"/>
+    <circle cx="20" cy="20" r="2" fill="#0A0A0A"/>
+    <circle cx="24" cy="24" r="2" fill="#0A0A0A"/>
+    <circle cx="20" cy="28" r="2" fill="#0A0A0A"/>
+    <circle cx="20" cy="24" r="2" fill="#0A0A0A"/>
+  </g>
+  <!-- Text: ONE CARBO -->
+  <text x="44" y="32" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#FAFAFA">
+    <tspan>ONE</tspan>
+    <tspan fill="#22C55E"> CARBO</tspan>
+  </text>
+</svg>
