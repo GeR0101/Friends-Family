@@ -18,6 +18,7 @@ export default function RoomPage({
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [roomUrl, setRoomUrl] = useState("");
+  const [meetingEnded, setMeetingEnded] = useState(false);
 
   useEffect(() => {
     if (!name || callFrameRef.current) return;
