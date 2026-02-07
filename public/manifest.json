@@ -1,11 +1,12 @@
 {
-  "name": "One Carbo Meeting",
-  "short_name": "OC Meeting",
-  "description": "Video-Meeting-Tool von One Carbo",
+  "name": "FamilyCall",
+  "short_name": "FamilyCall",
+  "description": "Ein Knopf. Ein Anruf. Video für die Familie.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A0A0A",
   "theme_color": "#0A0A0A",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/favicon.png",
