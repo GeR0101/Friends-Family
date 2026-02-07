@@ -66,8 +66,7 @@
         "embla-carousel-autoplay": "^8.6.0",
         "embla-carousel-react": "^8.6.0",
         "estree-walker": "2.0.2",
-        "firebase": "^12.9.0",
-        "firebase-admin": "^13.6.1",
+
         "framer-motion": "^12.23.24",
         "input-otp": "^1.4.2",
         "lucide-react": "^0.552.0",
