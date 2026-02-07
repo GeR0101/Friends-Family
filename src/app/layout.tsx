@@ -5,8 +5,8 @@ import ErrorReporter from "@/components/ErrorReporter";
 import Script from "next/script";
 
 export const metadata: Metadata = {
-  title: "One Carbo Meeting",
-  description: "Video-Meeting-Tool von One Carbo - Einfach Räume erstellen und mit Partnern verbinden",
+  title: "FamilyCall - Video für die Familie",
+  description: "Ein Knopf. Ein Anruf. So einfach. Video-Anrufe für Kinder und Eltern.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "OC Meeting",
+    title: "FamilyCall",
   },
 };
 
