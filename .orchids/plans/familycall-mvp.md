@@ -1530,47 +1530,50 @@ export const metadata: Metadata = {
 
 ---
 
-## Neue Ordnerstruktur
+## Neue Ordnerstruktur (nach Implementierung)
 
 ```
 src/
 ├── app/
 │   ├── api/
-│   │   ├── rooms/route.ts          # Bestehend (Daily)
+│   │   ├── rooms/route.ts              # Bestehend (Daily) - wiederverwendet
 │   │   ├── call/
-│   │   │   ├── request/route.ts    # NEU: Anruf starten
-│   │   │   ├── accept/route.ts     # NEU: Anruf annehmen
-│   │   │   ├── decline/route.ts    # NEU: Anruf ablehnen
-│   │   │   └── status/route.ts     # NEU: Status abfragen
+│   │   │   ├── request/route.ts        # NEU: Anruf starten
+│   │   │   ├── accept/route.ts         # NEU: Anruf annehmen
+│   │   │   ├── decline/route.ts        # NEU: Anruf ablehnen
+│   │   │   └── status/route.ts         # NEU: Status abfragen
 │   │   ├── push/
-│   │   │   └── register/route.ts   # NEU: Token registrieren
+│   │   │   └── register/route.ts       # NEU: Token registrieren
 │   │   └── family/
-│   │       ├── create/route.ts     # NEU: Familie erstellen
-│   │       └── pair/route.ts       # NEU: Gerät pairen
+│   │       ├── create/route.ts         # NEU: Familie erstellen
+│   │       └── pair/route.ts           # NEU: Gerät pairen
 │   ├── kid/
 │   │   └── [familyId]/
-│   │       └── page.tsx            # NEU: Kind-Oberfläche
+│   │       └── page.tsx                # NEU: Kind-Oberfläche (One-Button)
 │   ├── parent/
-│   │   ├── page.tsx                # NEU: Eltern-Dashboard
-│   │   └── call/
-│   │       └── [callId]/page.tsx   # NEU: Eingehender Anruf
-│   ├── room/[name]/page.tsx        # Bestehend (Daily Call)
+│   │   └── page.tsx                    # NEU: Eltern-Dashboard
 │   ├── setup/
-│   │   └── page.tsx                # NEU: Onboarding/Pairing
-│   ├── page.tsx                    # Landing Page (anpassen)
-│   └── layout.tsx                  # Bestehend
-├── components/
-│   ├── FCMHandler.tsx              # NEU: Push-Setup
-│   └── CallButton.tsx              # NEU: Großer Anruf-Button
+│   │   └── page.tsx                    # NEU: Onboarding/Pairing
+│   ├── room/[name]/page.tsx            # Bestehend (Daily Call) - wiederverwendet
+│   ├── page.tsx                        # Landing Page (anpassen)
+│   └── layout.tsx                      # Metadata anpassen
 ├── lib/
-│   ├── firebase.ts                 # NEU: Firebase Client
-│   ├── firebase-admin.ts           # NEU: Firebase Server
-│   ├── kv.ts                       # NEU: Vercel KV Helpers
-│   └── jwt.ts                      # NEU: JWT Handling
+│   ├── db/
+│   │   ├── schema.ts                   # NEU: Drizzle Schema
+│   │   └── index.ts                    # NEU: DB Connection
+│   ├── firebase/
+│   │   ├── client.ts                   # NEU: Firebase Client SDK
+│   │   └── admin.ts                    # NEU: Firebase Admin SDK
+│   ├── hooks/                          # Bestehend
+│   └── utils.ts                        # Bestehend
 public/
-├── firebase-messaging-sw.js        # NEU: Service Worker
-├── manifest.json                   # Anpassen
-└── icon-*.png                      # Neue Icons
+├── firebase-messaging-sw.js            # NEU: Service Worker für Push
+├── manifest.json                       # Anpassen (FamilyCall Branding)
+├── icon-192.png                        # Neue FamilyCall Icons
+├── icon-512.png                        # Neue FamilyCall Icons
+└── favicon.png                         # Neues Favicon
+drizzle/                                # NEU: Migrations-Ordner
+drizzle.config.ts                       # NEU: Drizzle Config
 ```
 
 ---
