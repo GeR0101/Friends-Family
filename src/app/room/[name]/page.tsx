@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, use } from "react";
 import DailyIframe, { DailyCall } from "@daily-co/daily-js";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function RoomPage({
   params,
@@ -11,6 +11,8 @@ export default function RoomPage({
 }) {
   const { name } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isGuest = searchParams.get("guest") === "true";
   const containerRef = useRef<HTMLDivElement>(null);
   const callFrameRef = useRef<DailyCall | null>(null);
     const [isJoining, setIsJoining] = useState(false);
@@ -66,7 +68,11 @@ export default function RoomPage({
           callFrameRef.current = frame;
 
           frame.on("left-meeting", () => {
-            router.push("/");
+            if (isGuest) {
+              router.push("/danke");
+            } else {
+              router.push("/");
+            }
           });
 
           frame.on("loaded", () => {
@@ -97,7 +103,7 @@ export default function RoomPage({
           callFrameRef.current = null;
         }
       };
-    }, [name, router]);
+    }, [name, router, isGuest]);
 
   const copyLink = async () => {
     const link = window.location.href;
