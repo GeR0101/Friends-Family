@@ -2,7 +2,7 @@
 
 ## Anforderung
 
-Refaktorierung des bestehenden OneCarbo Video-Meeting-Systems zu **FamilyCall** - einer extrem einfachen Familien-Video-App:
+**Komplett neue App** basierend auf OneCarbo-Codebase zu **FamilyCall** - einer extrem einfachen Familien-Video-App:
 
 - Kind klickt auf einen Button
 - Eltern erhalten Push-Notification
@@ -11,24 +11,30 @@ Refaktorierung des bestehenden OneCarbo Video-Meeting-Systems zu **FamilyCall** 
 - DSGVO-konform
 - Minimal-UI
 
+**MVP-Scope (Minimal):** Nur One-Button + Push + Video - keine Extras
+
+---
+
 ## Bestehendes System (Analyse)
 
-### Was vorhanden ist:
+### Was vorhanden ist (wiederverwendbar):
 | Komponente | Datei | Status |
 |------------|-------|--------|
 | Next.js App Router | `src/app/` | ✅ Vorhanden |
-| Daily.co Integration | `src/app/room/[name]/page.tsx` | ✅ Vorhanden |
-| Room API | `src/app/api/rooms/route.ts` | ✅ Vorhanden |
-| PWA Manifest | `public/manifest.json` | ✅ Vorhanden |
-| Icons (192/512) | `public/icon-*.png` | ✅ Vorhanden |
+| Daily.co Integration | `src/app/room/[name]/page.tsx` | ✅ Basis vorhanden |
+| Room API | `src/app/api/rooms/route.ts` | ✅ Wiederverwendbar |
+| PWA Manifest | `public/manifest.json` | ✅ Anpassen |
+| Icons (192/512) | `public/icon-*.png` | ✅ Neue Icons nötig |
+| Tailwind CSS | `src/app/globals.css` | ✅ Vorhanden |
+| Radix UI Components | `package.json` | ✅ Vorhanden |
 
-### Was fehlt:
+### Was fehlt (neu zu implementieren):
 - Push-Notification System (Firebase FCM)
 - Service Worker für Background Push
 - Call State Machine
 - Kinder-UI (One-Button)
-- Eltern-Dashboard
-- Datenbank für Pairing/Tokens
+- Eltern-UI (Push-Empfang)
+- Datenbank für Pairing/Tokens (Vercel Postgres)
 - JWT-basierte Sicherheit
 
 ---
@@ -44,7 +50,7 @@ Refaktorierung des bestehenden OneCarbo Video-Meeting-Systems zu **FamilyCall** 
 │   │   Kind-UI    │         │  Eltern-UI   │                     │
 │   │  /kid/[id]   │         │   /parent    │                     │
 │   │              │         │              │                     │
-│   │  [📞 ANRUF] │ ──────▶ │  Push + UI   │                     │
+│   │  [ANRUFEN]   │ ──────▶ │  Push + UI   │                     │
 │   └──────────────┘         └──────────────┘                     │
 │          │                        │                              │
 │          ▼                        ▼                              │
@@ -53,13 +59,13 @@ Refaktorierung des bestehenden OneCarbo Video-Meeting-Systems zu **FamilyCall** 
 │   │  /api/call/request                      │                    │
 │   │  /api/call/accept                       │                    │
 │   │  /api/push/register                     │                    │
-│   │  /api/daily/room                        │                    │
+│   │  /api/rooms (bestehend)                 │                    │
 │   └────────────────────────────────────────┘                    │
 │          │                        │                              │
 │          ▼                        ▼                              │
 │   ┌──────────────┐         ┌──────────────┐                     │
-│   │  Vercel KV   │         │ Firebase FCM │                     │
-│   │  (State DB)  │         │   (Push)     │                     │
+│   │   Vercel     │         │ Firebase FCM │                     │
+│   │   Postgres   │         │   (Push)     │                     │
 │   └──────────────┘         └──────────────┘                     │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
@@ -69,46 +75,95 @@ Refaktorierung des bestehenden OneCarbo Video-Meeting-Systems zu **FamilyCall** 
 
 ## Implementierungsplan
 
-### Phase 1: Infrastruktur (Tag 1-3)
+### Phase 0: Firebase Projekt erstellen (MANUELL - vor Coding)
 
-#### 1.1 Firebase Project Setup
-**Externe Schritte (manuell):**
-1. Firebase Console → Neues Projekt "FamilyCall"
-2. Cloud Messaging aktivieren
-3. Web-App hinzufügen
-4. VAPID Keys generieren (Project Settings → Cloud Messaging → Web Push certificates)
+> **WICHTIG:** Diese Schritte müssen VOR der Implementierung manuell durchgeführt werden!
 
-**Environment Variables (.env.local):**
+#### Schritt-für-Schritt Firebase Setup:
+
+1. **Firebase Console öffnen:** https://console.firebase.google.com/
+2. **Neues Projekt erstellen:**
+   - Klick auf "Projekt hinzufügen"
+   - Name: `familycall` (oder eigener Name)
+   - Google Analytics: Optional (kann deaktiviert werden)
+3. **Cloud Messaging aktivieren:**
+   - Projekteinstellungen → Cloud Messaging Tab
+   - "Web Push-Zertifikate" → "Schlüsselpaar generieren"
+   - **VAPID Key kopieren** (öffentlicher Schlüssel)
+4. **Web-App hinzufügen:**
+   - Projektübersicht → "App hinzufügen" → Web (</> Icon)
+   - App-Nickname: `FamilyCall Web`
+   - Firebase SDK Config kopieren:
+     ```javascript
+     apiKey: "AIza...",
+     authDomain: "familycall-xxx.firebaseapp.com",
+     projectId: "familycall-xxx",
+     storageBucket: "familycall-xxx.appspot.com",
+     messagingSenderId: "123456789",
+     appId: "1:123456789:web:abc..."
+     ```
+5. **Service Account erstellen (für Server):**
+   - Projekteinstellungen → Dienstkonten
+   - "Neuen privaten Schlüssel generieren"
+   - JSON-Datei sicher speichern
+
+---
+
+### Phase 1: Infrastruktur (Tag 1-2)
+
+#### 1.1 Environment Variables konfigurieren
+**Neue Datei: `.env.local`** (lokal) und Vercel Dashboard (production)
+
 ```env
-# Firebase Client
-NEXT_PUBLIC_FIREBASE_API_KEY=xxx
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=xxx
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=xxx
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=xxx
-NEXT_PUBLIC_FIREBASE_APP_ID=xxx
-NEXT_PUBLIC_VAPID_KEY=xxx
+# ═══════════════════════════════════════════════════════════════
+# Firebase Client (öffentlich - NEXT_PUBLIC_)
+# ═══════════════════════════════════════════════════════════════
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSy...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=familycall-xxx.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=familycall-xxx
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=familycall-xxx.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
+NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789:web:abc...
+NEXT_PUBLIC_VAPID_KEY=BNx8...
 
-# Firebase Admin (Server)
-FIREBASE_PROJECT_ID=xxx
-FIREBASE_CLIENT_EMAIL=xxx
-FIREBASE_PRIVATE_KEY=xxx
+# ═══════════════════════════════════════════════════════════════
+# Firebase Admin (Server-seitig - GEHEIM!)
+# ═══════════════════════════════════════════════════════════════
+FIREBASE_PROJECT_ID=familycall-xxx
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxx@familycall-xxx.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 
-# Existing
+# ═══════════════════════════════════════════════════════════════
+# Daily.co (bestehend)
+# ═══════════════════════════════════════════════════════════════
 DAILY_API_KEY=xxx
+
+# ═══════════════════════════════════════════════════════════════
+# Vercel Postgres (automatisch nach Setup)
+# ═══════════════════════════════════════════════════════════════
+POSTGRES_URL=postgres://...
+POSTGRES_PRISMA_URL=postgres://...
+POSTGRES_URL_NO_SSL=postgres://...
+POSTGRES_URL_NON_POOLING=postgres://...
+POSTGRES_USER=...
+POSTGRES_HOST=...
+POSTGRES_PASSWORD=...
+POSTGRES_DATABASE=...
+
+# ═══════════════════════════════════════════════════════════════
+# App Config
+# ═══════════════════════════════════════════════════════════════
+NEXT_PUBLIC_APP_URL=https://familycall.vercel.app
+JWT_SECRET=your-super-secret-jwt-key-min-32-chars
 ```
 
-#### 1.2 Vercel KV Setup
+#### 1.2 Vercel Postgres Setup
 **Externe Schritte (manuell):**
-1. Vercel Dashboard → Storage → Create KV Database
-2. Connect to Project
-
-**Environment Variables (automatisch):**
-```env
-KV_URL=xxx
-KV_REST_API_URL=xxx
-KV_REST_API_TOKEN=xxx
-KV_REST_API_READ_ONLY_TOKEN=xxx
-```
+1. Vercel Dashboard → Storage → Create Database → Postgres
+2. Name: `familycall-db`
+3. Region: `fra1` (Frankfurt - DSGVO!)
+4. Connect to Project
+5. Environment Variables werden automatisch hinzugefügt
 
 ---
 
