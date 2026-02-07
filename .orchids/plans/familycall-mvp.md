@@ -1581,25 +1581,29 @@ drizzle.config.ts                       # NEU: Drizzle Config
 ## Neue Dependencies
 
 ```bash
-npm install firebase firebase-admin @vercel/kv jose
+npm install firebase firebase-admin @vercel/postgres nanoid
 ```
 
 | Package | Version | Zweck |
 |---------|---------|-------|
-| `firebase` | ^11.0.0 | Client SDK für Push |
-| `firebase-admin` | ^13.0.0 | Server SDK für Sending |
-| `@vercel/kv` | ^3.0.0 | Datenbank |
-| `jose` | ^5.0.0 | JWT Handling |
+| `firebase` | ^11.0.0 | Client SDK für Push Notifications |
+| `firebase-admin` | ^13.0.0 | Server SDK für Push Sending |
+| `@vercel/postgres` | ^0.10.0 | Vercel Postgres Integration |
+| `nanoid` | ^5.0.0 | Kurze, eindeutige IDs |
+
+**Bereits vorhanden:**
+- `drizzle-orm` ^0.44.7 (für DB Schema)
+- `drizzle-kit` ^0.31.6 (für Migrations)
 
 ---
 
 ## Qualitätskriterien
 
-| Metrik | Ziel | Messung |
-|--------|------|---------|
+| Metrik | Ziel | Wie gemessen |
+|--------|------|--------------|
 | Push-Latenz | <2s | Zeit von Button-Click bis Push-Ankunft |
-| Clicks zum Call | <3 | Kind: 1, Eltern: 2 (Push + Annehmen) |
-| Call Success Rate | 99% | Erfolgreiche Verbindungen |
+| Clicks zum Call | ≤3 | Kind: 1, Eltern: 2 (Push + Annehmen) |
+| Call Success Rate | 99% | Erfolgreiche Verbindungen / Versuche |
 | iOS Kompatibilität | ✅ | Safari PWA Push (iOS 16.4+) |
 
 ---
@@ -1608,76 +1612,77 @@ npm install firebase firebase-admin @vercel/kv jose
 
 | Risiko | Wahrscheinlichkeit | Mitigation |
 |--------|-------------------|------------|
-| iOS Push-Einschränkungen | Mittel | PWA muss installiert sein für Push |
-| Firebase Kosten | Niedrig | Free Tier: 10k/Monat ausreichend |
+| iOS Push-Einschränkungen | Mittel | PWA muss installiert sein für Push auf iOS |
+| Firebase Kosten | Niedrig | Free Tier: 10k Nachrichten/Monat ausreichend |
 | Daily.co Limits | Niedrig | Free Tier: 2000 Min/Monat |
 | Browser-Kompatibilität | Niedrig | Fallback: SMS (Phase 2) |
 
 ---
 
-## Testplan
+## Rollout-Plan (MVP in 8 Tagen)
 
-### Unit Tests
-- [ ] JWT Generierung/Validierung
-- [ ] Call State Machine Transitions
-- [ ] Rate Limiting Logic
-
-### Integration Tests
-- [ ] Push-Notification Delivery
-- [ ] Daily Room Creation
-- [ ] KV Read/Write
-
-### E2E Tests
-- [ ] Kompletter Call-Flow (Kind → Eltern → Video)
-- [ ] Pairing-Prozess
-- [ ] PWA Installation
-
----
-
-## Rollout-Plan
-
-### Woche 1: Infrastruktur
-- [ ] Firebase Projekt erstellen
-- [ ] Vercel KV einrichten
+### Tag 1-2: Infrastruktur
+- [ ] Firebase Projekt erstellen (manuell)
+- [ ] Vercel Postgres einrichten (manuell)
 - [ ] Environment Variables konfigurieren
-- [ ] Firebase Client/Server Integration
+- [ ] Dependencies installieren
 
-### Woche 2: Core Features
-- [ ] API Routes implementieren
-- [ ] Kind-UI bauen
-- [ ] Eltern-Dashboard bauen
-- [ ] Push-Notifications testen
+### Tag 2-3: Datenbank
+- [ ] Drizzle Schema erstellen
+- [ ] DB Connection einrichten
+- [ ] Migrations ausführen
 
-### Woche 3: Polish & Launch
-- [ ] Pairing-Flow optimieren
-- [ ] Error Handling verbessern
-- [ ] Performance-Tests
-- [ ] Beta-Release an Familie
+### Tag 3-4: Firebase Integration
+- [ ] Firebase Client SDK
+- [ ] Firebase Admin SDK
+- [ ] Service Worker für Background Push
+
+### Tag 4-5: API Routes
+- [ ] `/api/family/create` & `/api/family/pair`
+- [ ] `/api/push/register`
+- [ ] `/api/call/request`, `accept`, `decline`, `status`
+
+### Tag 5-6: Kind-UI
+- [ ] One-Button Interface
+- [ ] Call Status States
+- [ ] Polling & Navigation
+
+### Tag 6-7: Eltern-UI
+- [ ] Push-Aktivierung
+- [ ] Eingehender Anruf Modal
+- [ ] Dashboard
+
+### Tag 7-8: Setup & Polish
+- [ ] Pairing Flow
+- [ ] PWA Manifest Update
+- [ ] Branding (Icons, Metadata)
+- [ ] Testing
 
 ---
 
-## Phase 2 Features (Optional)
+## Phase 2 Features (Optional - nach MVP)
 
 - **Multi-Eltern**: Mehrere Eltern pro Familie
 - **Backup-Contacts**: Oma/Opa als Fallback
 - **Time Windows**: "Nicht vor 7 Uhr"
 - **SMS-Fallback**: Wenn Push nicht ankommt
 - **Offline-Mode**: Nachricht wenn offline
-- **Call-Recording**: Voicemails
+- **Anruf-History**: Vergangene Anrufe einsehen
+- **DND-Modus**: Do Not Disturb
 
 ---
 
 ## Zusammenfassung
 
-| Was | Aufwand | Priorität |
-|-----|---------|-----------|
-| Firebase Setup | 2h (manuell) | P0 |
-| Push-Integration | 1 Tag | P0 |
-| Kind-UI | 1 Tag | P0 |
-| Eltern-Dashboard | 2 Tage | P0 |
-| Pairing-Flow | 1 Tag | P0 |
-| JWT Security | 0.5 Tage | P1 |
-| Rate Limiting | 0.5 Tage | P1 |
-| Tests | 2 Tage | P1 |
+| Phase | Dateien | Aufwand |
+|-------|---------|---------|
+| Infrastruktur | ENV, Vercel Postgres | 0.5 Tage |
+| Datenbank | `schema.ts`, `index.ts`, `drizzle.config.ts` | 0.5 Tage |
+| Firebase | `client.ts`, `admin.ts`, `firebase-messaging-sw.js` | 1 Tag |
+| API Routes | 6 Route-Dateien | 1 Tag |
+| Kind-UI | `kid/[familyId]/page.tsx` | 1 Tag |
+| Eltern-UI | `parent/page.tsx` | 1 Tag |
+| Setup | `setup/page.tsx` | 0.5 Tage |
+| PWA & Branding | `manifest.json`, `layout.tsx` | 0.5 Tage |
 
-**Geschätzter MVP-Aufwand: 10-14 Tage**
+**Geschätzter MVP-Aufwand: 6-8 Tage**
