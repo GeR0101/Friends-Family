@@ -106,7 +106,7 @@ export default function RoomPage({
     }, [name, router, isGuest]);
 
   const copyLink = async () => {
-    const link = window.location.href;
+    const link = `${window.location.origin}/room/${name}?guest=true`;
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
