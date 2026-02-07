@@ -65,15 +65,9 @@ export default function RoomPage({
 
         callFrameRef.current = frame;
 
-        frame.on("left-meeting", () => {
-          // Nur Sauna-Raum leitet zur Startseite weiter
-          if (name.toLowerCase() === "sauna") {
-            router.push("/");
-          } else {
-            // Andere Räume: "Meeting beendet" Seite anzeigen
+          frame.on("left-meeting", () => {
             setMeetingEnded(true);
-          }
-        });
+          });
 
         frame.on("loaded", () => {
           setIsJoining(false);
