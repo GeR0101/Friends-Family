@@ -861,52 +861,202 @@ export async function POST(req: NextRequest) {
       { error: "Interner Fehler" },
       { status: 500 }
     );
-  }
-}
+```
 
 ---
 
-### Phase 4: Kind-UI (Tag 8-10)
+### Phase 5: Kind-UI (Tag 5-6)
 
-#### 4.1 Hauptseite
+#### 5.1 Hauptseite - One-Button Interface
 **Neue Datei: `src/app/kid/[familyId]/page.tsx`**
 
 ```tsx
 "use client";
 
-export default function KidPage({ params }) {
-  const [status, setStatus] = useState<"idle" | "calling" | "connected">("idle");
-  
+import { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
+
+type CallStatus = "idle" | "calling" | "connecting" | "error" | "timeout";
+
+export default function KidPage({
+  params,
+}: {
+  params: Promise<{ familyId: string }>;
+}) {
+  const { familyId } = use(params);
+  const router = useRouter();
+  const [status, setStatus] = useState<CallStatus>("idle");
+  const [error, setError] = useState("");
+
+  // Device ID aus localStorage oder neu generieren
+  const getDeviceId = () => {
+    if (typeof window === "undefined") return null;
+    let deviceId = localStorage.getItem("familycall_device_id");
+    if (!deviceId) {
+      // Wenn noch nicht gepairt, redirect zu Setup
+      router.push(`/setup?familyId=${familyId}&role=kid`);
+      return null;
+    }
+    return deviceId;
+  };
+
   const startCall = async () => {
+    const deviceId = getDeviceId();
+    if (!deviceId) return;
+
     setStatus("calling");
-    const res = await fetch("/api/call/request", {
-      method: "POST",
-      body: JSON.stringify({ deviceId: getDeviceId() }),
-    });
-    const { callId } = await res.json();
-    
-    // Poll for acceptance
-    pollCallStatus(callId);
+    setError("");
+
+    try {
+      const res = await fetch("/api/call/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Fehler beim Anrufen");
+        setStatus("error");
+        return;
+      }
+
+      // Polling für Call-Status starten
+      pollCallStatus(data.callId);
+    } catch (err) {
+      setError("Verbindungsfehler");
+      setStatus("error");
+    }
+  };
+
+  const pollCallStatus = async (callId: string) => {
+    const maxAttempts = 60; // 30 Sekunden bei 500ms Interval
+    let attempts = 0;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setStatus("timeout");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/call/status?callId=${callId}`);
+        const data = await res.json();
+
+        if (data.status === "ACCEPTED" && data.roomUrl) {
+          setStatus("connecting");
+          // Zum Video-Room navigieren
+          router.push(`/room/${data.roomName}`);
+          return;
+        }
+
+        if (data.status === "DECLINED") {
+          setError("Anruf wurde abgelehnt");
+          setStatus("error");
+          return;
+        }
+
+        if (data.status === "TIMEOUT") {
+          setStatus("timeout");
+          return;
+        }
+
+        // Weiter pollen
+        attempts++;
+        setTimeout(poll, 500);
+      } catch {
+        attempts++;
+        setTimeout(poll, 500);
+      }
+    };
+
+    poll();
+  };
+
+  const resetCall = () => {
+    setStatus("idle");
+    setError("");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-400 to-purple-500 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-b from-blue-400 via-purple-400 to-pink-400 flex items-center justify-center p-4">
+      {/* IDLE: Großer Anruf-Button */}
       {status === "idle" && (
-        <button 
+        <button
           onClick={startCall}
-          className="w-64 h-64 rounded-full bg-green-500 shadow-2xl flex items-center justify-center"
+          className="w-72 h-72 sm:w-80 sm:h-80 rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-2xl flex flex-col items-center justify-center transform hover:scale-105 active:scale-95 transition-all duration-200"
         >
-          <span className="text-6xl">📞</span>
-          <span className="text-2xl font-bold text-white mt-4">
+          <span className="text-8xl sm:text-9xl mb-2">📞</span>
+          <span className="text-xl sm:text-2xl font-bold text-white text-center px-4">
             Mama & Papa anrufen
           </span>
         </button>
       )}
-      
+
+      {/* CALLING: Warte-Animation */}
       {status === "calling" && (
-        <div className="text-center text-white">
-          <div className="animate-pulse text-8xl mb-8">📱</div>
-          <p className="text-2xl">Rufe Mama & Papa...</p>
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-48 h-48 rounded-full bg-white/20 animate-ping absolute" />
+            <div className="w-48 h-48 rounded-full bg-white/30 flex items-center justify-center relative">
+              <span className="text-7xl animate-bounce">📱</span>
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-white mt-8">
+            Rufe Mama & Papa...
+          </p>
+          <p className="text-lg text-white/80 mt-2">
+            Warte kurz, sie werden benachrichtigt!
+          </p>
+        </div>
+      )}
+
+      {/* CONNECTING: Verbindung wird hergestellt */}
+      {status === "connecting" && (
+        <div className="text-center">
+          <div className="w-32 h-32 border-8 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-2xl font-bold text-white mt-8">
+            Verbinde...
+          </p>
+        </div>
+      )}
+
+      {/* TIMEOUT: Keine Antwort */}
+      {status === "timeout" && (
+        <div className="text-center">
+          <span className="text-8xl block mb-6">😢</span>
+          <p className="text-2xl font-bold text-white mb-4">
+            Keine Antwort
+          </p>
+          <p className="text-lg text-white/80 mb-8">
+            Mama & Papa sind gerade beschäftigt
+          </p>
+          <button
+            onClick={resetCall}
+            className="px-8 py-4 bg-white/20 hover:bg-white/30 text-white text-xl font-bold rounded-full transition-colors"
+          >
+            Nochmal versuchen
+          </button>
+        </div>
+      )}
+
+      {/* ERROR: Fehler */}
+      {status === "error" && (
+        <div className="text-center">
+          <span className="text-8xl block mb-6">😕</span>
+          <p className="text-2xl font-bold text-white mb-2">
+            Ups!
+          </p>
+          <p className="text-lg text-white/80 mb-8">
+            {error || "Etwas ist schiefgegangen"}
+          </p>
+          <button
+            onClick={resetCall}
+            className="px-8 py-4 bg-white/20 hover:bg-white/30 text-white text-xl font-bold rounded-full transition-colors"
+          >
+            Nochmal versuchen
+          </button>
         </div>
       )}
     </div>
@@ -914,44 +1064,426 @@ export default function KidPage({ params }) {
 }
 ```
 
-**Design-Prinzipien:**
-- Vollbild, keine Ablenkungen
-- Ein großer, bunter Button
-- Kinderfreundliche Farben (Blau, Lila, Grün)
-- Große Emojis statt Text wo möglich
-- Optional: Foto der Eltern auf dem Button
-
 ---
 
-### Phase 5: Eltern-UI (Tag 10-12)
+### Phase 6: Eltern-UI (Tag 6-7)
 
-#### 5.1 Dashboard
+#### 6.1 Eltern-Dashboard (Minimal für MVP)
 **Neue Datei: `src/app/parent/page.tsx`**
 
-Features:
-- Eingehende Anrufe (mit Annehmen/Ablehnen)
-- Push-Status (aktiviert/deaktiviert)
-- DND-Modus (Do Not Disturb)
-- Anruf-History
-- Geräte-Verwaltung
-- QR-Code für Kind-Pairing
-
-#### 5.2 Incoming Call UI
-**Neue Datei: `src/app/parent/call/[callId]/page.tsx`**
-
 ```tsx
-// Wird geöffnet wenn Push geklickt wird
-// Zeigt: "Max möchte dich anrufen"
-// Buttons: Annehmen | Ablehnen
-// Annehmen → Daily Room beitreten
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { requestPushToken, onForegroundMessage } from "@/lib/firebase/client";
+
+export default function ParentPage() {
+  const router = useRouter();
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [incomingCall, setIncomingCall] = useState<{
+    callId: string;
+    kidName: string;
+  } | null>(null);
+
+  useEffect(() => {
+    // Device ID aus localStorage
+    const storedDeviceId = localStorage.getItem("familycall_device_id");
+    if (!storedDeviceId) {
+      router.push("/setup?role=parent");
+      return;
+    }
+    setDeviceId(storedDeviceId);
+
+    // Push Setup
+    setupPush(storedDeviceId);
+
+    // Foreground Message Handler
+    onForegroundMessage((payload: any) => {
+      const data = payload.data;
+      if (data?.callId) {
+        setIncomingCall({
+          callId: data.callId,
+          kidName: data.kidName || "Dein Kind",
+        });
+      }
+    });
+  }, [router]);
+
+  const setupPush = async (deviceId: string) => {
+    setIsLoading(true);
+    const token = await requestPushToken();
+    
+    if (token) {
+      // Token an Server senden
+      await fetch("/api/push/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, token }),
+      });
+      setPushEnabled(true);
+    }
+    setIsLoading(false);
+  };
+
+  const acceptCall = async () => {
+    if (!incomingCall) return;
+
+    const res = await fetch("/api/call/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callId: incomingCall.callId }),
+    });
+
+    const data = await res.json();
+    if (data.roomUrl) {
+      router.push(`/room/${data.roomName}`);
+    }
+  };
+
+  const declineCall = async () => {
+    if (!incomingCall) return;
+
+    await fetch("/api/call/decline", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callId: incomingCall.callId }),
+    });
+
+    setIncomingCall(null);
+  };
+
+  // Eingehender Anruf UI
+  if (incomingCall) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-green-400 to-blue-500 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-32 h-32 rounded-full bg-white/20 animate-pulse mx-auto mb-6 flex items-center justify-center">
+            <span className="text-6xl">📞</span>
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Anruf!
+          </h1>
+          <p className="text-xl text-white/90 mb-8">
+            {incomingCall.kidName} möchte dich erreichen
+          </p>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={declineCall}
+              className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+            >
+              <span className="text-3xl">❌</span>
+            </button>
+            <button
+              onClick={acceptCall}
+              className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors animate-bounce"
+            >
+              <span className="text-3xl">✅</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Dashboard UI
+  return (
+    <div className="min-h-screen bg-[#0A0A0A] text-white p-6">
+      <div className="max-w-md mx-auto">
+        <h1 className="text-2xl font-bold mb-8">FamilyCall</h1>
+
+        {/* Push Status */}
+        <div className="bg-zinc-900 rounded-xl p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Push-Benachrichtigungen</h2>
+          
+          {isLoading ? (
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="text-zinc-400">Einrichten...</span>
+            </div>
+          ) : pushEnabled ? (
+            <div className="flex items-center gap-3 text-green-500">
+              <span className="text-2xl">✅</span>
+              <span>Aktiviert - Du wirst benachrichtigt!</span>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-3 text-yellow-500 mb-4">
+                <span className="text-2xl">⚠️</span>
+                <span>Nicht aktiviert</span>
+              </div>
+              <button
+                onClick={() => deviceId && setupPush(deviceId)}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition-colors"
+              >
+                Push aktivieren
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Status Info */}
+        <div className="bg-zinc-900 rounded-xl p-6">
+          <h2 className="text-lg font-semibold mb-4">Status</h2>
+          <p className="text-zinc-400">
+            Wenn dein Kind den Anruf-Button drückt, erhältst du eine Benachrichtigung.
+          </p>
+          <p className="text-zinc-500 text-sm mt-4">
+            Tipp: Installiere diese App auf dem Homescreen für die beste Erfahrung!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 ```
 
 ---
 
-### Phase 6: PWA & Service Worker (Tag 12-13)
+### Phase 7: Setup/Pairing Flow (Tag 7-8)
 
-#### 6.1 Manifest aktualisieren
-**Datei: `public/manifest.json`**
+#### 7.1 Setup Page
+**Neue Datei: `src/app/setup/page.tsx`**
+
+```tsx
+"use client";
+
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+function SetupContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetRole = searchParams.get("role") as "kid" | "parent" | null;
+  const presetFamilyId = searchParams.get("familyId");
+
+  const [step, setStep] = useState<"choose" | "create" | "join">("choose");
+  const [role, setRole] = useState<"kid" | "parent" | null>(presetRole);
+  const [familyName, setFamilyName] = useState("");
+  const [pairCode, setPairCode] = useState("");
+  const [deviceName, setDeviceName] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Familie erstellen
+  const createFamily = async () => {
+    if (!familyName.trim()) {
+      setError("Bitte gib einen Familiennamen ein");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/family/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: familyName }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error);
+        return;
+      }
+
+      // Automatisch als Parent joinen
+      await joinFamily(data.pairCode, "Eltern-Gerät", "parent");
+      
+      // Pair-Code anzeigen
+      alert(`Dein Pairing-Code: ${data.pairCode}\n\nTeile diesen Code mit anderen Geräten.`);
+      
+    } catch {
+      setError("Verbindungsfehler");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Familie beitreten
+  const joinFamily = async (code: string, name: string, deviceRole: "kid" | "parent") => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/family/pair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pairCode: code,
+          deviceName: name,
+          role: deviceRole,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error);
+        return;
+      }
+
+      // Device ID speichern
+      localStorage.setItem("familycall_device_id", data.deviceId);
+      localStorage.setItem("familycall_family_id", data.familyId);
+      localStorage.setItem("familycall_role", deviceRole);
+
+      // Redirect basierend auf Rolle
+      if (deviceRole === "kid") {
+        router.push(`/kid/${data.familyId}`);
+      } else {
+        router.push("/parent");
+      }
+    } catch {
+      setError("Verbindungsfehler");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-blue-500 to-purple-600 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+        <h1 className="text-2xl font-bold text-center mb-6">
+          FamilyCall Setup
+        </h1>
+
+        {/* Step: Choose Role */}
+        {step === "choose" && !role && (
+          <div className="space-y-4">
+            <p className="text-gray-600 text-center mb-6">
+              Wer benutzt dieses Gerät?
+            </p>
+            <button
+              onClick={() => { setRole("parent"); setStep("create"); }}
+              className="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-3"
+            >
+              <span className="text-2xl">👨‍👩‍👧</span>
+              Ich bin ein Elternteil
+            </button>
+            <button
+              onClick={() => { setRole("kid"); setStep("join"); }}
+              className="w-full py-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-3"
+            >
+              <span className="text-2xl">👶</span>
+              Ich bin ein Kind
+            </button>
+          </div>
+        )}
+
+        {/* Step: Create Family (Parent) */}
+        {step === "create" && (
+          <div className="space-y-4">
+            <p className="text-gray-600 text-center mb-4">
+              Erstelle deine Familie oder tritt einer bei
+            </p>
+            
+            <input
+              type="text"
+              placeholder="Familienname (z.B. Familie Müller)"
+              value={familyName}
+              onChange={(e) => setFamilyName(e.target.value)}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+
+            <button
+              onClick={createFamily}
+              disabled={isLoading}
+              className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors"
+            >
+              {isLoading ? "Erstelle..." : "Familie erstellen"}
+            </button>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">oder</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setStep("join")}
+              className="w-full py-3 border-2 border-gray-200 hover:border-gray-300 rounded-xl font-medium transition-colors"
+            >
+              Mit Code beitreten
+            </button>
+          </div>
+        )}
+
+        {/* Step: Join Family */}
+        {step === "join" && (
+          <div className="space-y-4">
+            <p className="text-gray-600 text-center mb-4">
+              Gib den Pairing-Code ein
+            </p>
+            
+            <input
+              type="text"
+              placeholder="Code (z.B. ABC123)"
+              value={pairCode}
+              onChange={(e) => setPairCode(e.target.value.toUpperCase())}
+              maxLength={6}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-center text-2xl tracking-widest font-mono"
+            />
+
+            <input
+              type="text"
+              placeholder={role === "kid" ? "Dein Name (z.B. Max)" : "Gerätename (z.B. Papas Handy)"}
+              value={deviceName}
+              onChange={(e) => setDeviceName(e.target.value)}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+            />
+
+            <button
+              onClick={() => joinFamily(pairCode, deviceName, role || "kid")}
+              disabled={isLoading || !pairCode || !deviceName}
+              className="w-full py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors"
+            >
+              {isLoading ? "Verbinde..." : "Beitreten"}
+            </button>
+
+            {role === "parent" && (
+              <button
+                onClick={() => setStep("create")}
+                className="w-full py-2 text-gray-500 hover:text-gray-700 text-sm"
+              >
+                ← Zurück
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <p className="mt-4 text-red-500 text-center text-sm">{error}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function SetupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-b from-blue-500 to-purple-600" />}>
+      <SetupContent />
+    </Suspense>
+  );
+}
+```
+
+---
+
+### Phase 8: PWA & Branding Update (Tag 8)
+
+#### 8.1 Manifest aktualisieren
+**Ändern: `public/manifest.json`**
+
 ```json
 {
   "name": "FamilyCall",
@@ -959,77 +1491,42 @@ Features:
   "description": "One-Tap Video für die Familie",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0A0A0A",
   "theme_color": "#22C55E",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "/favicon.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
 ```
 
-#### 6.2 FCM Handler Component
-**Neue Datei: `src/components/FCMHandler.tsx`**
+#### 8.2 Layout Metadata aktualisieren
+**Ändern: `src/app/layout.tsx`**
+
 ```typescript
-"use client";
-
-import { useEffect } from "react";
-import { getToken, onMessage } from "firebase/messaging";
-import { messaging } from "@/lib/firebase";
-
-export default function FCMHandler({ deviceId }: { deviceId: string }) {
-  useEffect(() => {
-    const setup = async () => {
-      const msg = await messaging();
-      if (!msg) return;
-
-      const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") return;
-
-      const token = await getToken(msg, {
-        vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY,
-        serviceWorkerRegistration: registration,
-      });
-
-      if (token) {
-        await fetch("/api/push/register", {
-          method: "POST",
-          body: JSON.stringify({ deviceId, token }),
-        });
-      }
-    };
-
-    setup();
-  }, [deviceId]);
-
-  return null;
-}
-```
-
----
-
-### Phase 7: Sicherheit (Tag 13-14)
-
-#### 7.1 JWT Pairing
-- Familie erstellt 6-stelligen Pair-Code
-- Kind-Gerät gibt Code ein → erhält JWT
-- JWT wird in localStorage gespeichert
-- Alle API-Calls validieren JWT
-
-#### 7.2 Rate Limiting
-```typescript
-// middleware.ts - Rate Limiting für API
-const rateLimit = {
-  "/api/call/request": { windowMs: 60000, max: 5 },
-  "/api/push/register": { windowMs: 60000, max: 3 },
+export const metadata: Metadata = {
+  title: "FamilyCall",
+  description: "One-Tap Video für die Familie - Einfach mit deinen Liebsten verbinden",
+  manifest: "/manifest.json",
+  // ... rest bleibt gleich
 };
 ```
-
-#### 7.3 Device Binding
-- Device-ID wird beim ersten Besuch generiert
-- Token an Device-ID gebunden
-- Verhindert Token-Diebstahl
 
 ---
 
