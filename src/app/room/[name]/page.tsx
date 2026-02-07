@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, use } from "react";
 import DailyIframe, { DailyCall } from "@daily-co/daily-js";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 
 export default function RoomPage({
   params,
