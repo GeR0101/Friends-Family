@@ -128,15 +128,13 @@ export default function RoomPage({
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] p-4">
         <div className="text-center">
-          <Image
-            src="/one-carbo-logo.png"
-            alt="One Carbo"
-            width={80}
-            height={80}
-            className="mx-auto mb-6 rounded-xl"
-          />
+          <div className="w-20 h-20 mx-auto bg-green-500/20 rounded-3xl flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
           <h2 className="text-xl font-semibold text-white mb-2">
-            Meeting beendet
+            Anruf beendet
           </h2>
           <p className="text-[#A1A1AA] mb-6">
             Danke für deine Teilnahme!
