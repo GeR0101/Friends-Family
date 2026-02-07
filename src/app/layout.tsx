@@ -5,23 +5,10 @@ import ErrorReporter from "@/components/ErrorReporter";
 import Script from "next/script";
 
 export const metadata: Metadata = {
-  title: "FamilyCall - Video für die Familie",
-  description: "Ein Knopf. Ein Anruf. So einfach. Video-Anrufe für Kinder und Eltern.",
-  manifest: "/manifest.json",
+  title: "One Carbo Meeting",
+  description: "Video-Meeting-Tool von One Carbo - Einfach Räume erstellen und mit Partnern verbinden",
   icons: {
-    icon: [
-      { url: "/favicon.png", type: "image/png" },
-      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
-    ],
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-    ],
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "FamilyCall",
+    icon: "/favicon.svg",
   },
 };
 
