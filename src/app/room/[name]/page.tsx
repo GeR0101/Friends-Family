@@ -153,12 +153,12 @@ export default function RoomPage({
             Fehler aufgetreten
           </h2>
           <p className="text-gray-400 mb-4">{error}</p>
-          <button
-            onClick={() => router.push("/")}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            Zurück zur Startseite
-          </button>
+            <button
+              onClick={() => router.push(isGuest ? "/danke" : "/")}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              {isGuest ? "Schließen" : "Zurück zur Startseite"}
+            </button>
         </div>
       </div>
     );
