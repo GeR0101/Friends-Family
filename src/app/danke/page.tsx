@@ -1,27 +1,17 @@
 "use client";
 
-import Image from "next/image";
-
 export default function DankePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 via-transparent to-green-900/10 pointer-events-none" />
+    <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-64 h-64 bg-pink-100 rounded-full opacity-30 blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-100 rounded-full opacity-30 blur-3xl" />
+      </div>
 
-      <main className="relative w-full max-w-md bg-[#141414] border border-[#2A2A2A] rounded-2xl shadow-2xl shadow-green-900/10 p-8 text-center">
-        <div className="flex justify-center mb-6">
-          <Image
-            src="/one-carbo-logo.png"
-            alt="One Carbo"
-            width={100}
-            height={100}
-            priority
-            className="rounded-xl"
-          />
-        </div>
-
-        <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+      <main className="relative w-full max-w-md bg-white border-2 border-pink-100 rounded-3xl shadow-lg shadow-pink-200/50 p-8 text-center">
+        <div className="w-20 h-20 bg-gradient-to-br from-green-300 to-green-400 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-md shadow-green-200">
           <svg
-            className="w-8 h-8 text-green-500"
+            className="w-10 h-10 text-white"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -35,21 +25,22 @@ export default function DankePage() {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-3">
-          Danke f&uuml;r deinen Besuch!
+        <h1 className="text-2xl font-bold text-gray-800 mb-3">
+          Danke für deinen Besuch!
         </h1>
-        <p className="text-[#A1A1AA] mb-2">
-          Die Saunarunde wurde beendet.
+        <p className="text-gray-500 mb-2">
+          Das Video-Meeting wurde beendet.
         </p>
-        <p className="text-[#777777] text-sm">
-          Du kannst dieses Fenster jetzt schlie&szlig;en.
+        <p className="text-gray-400 text-sm mb-8">
+          Bis zum nächsten Mal!
         </p>
 
-        <div className="mt-6 text-center">
-          <p className="text-xs text-[#555555]">
-            Powered by One Carbo
-          </p>
-        </div>
+        <a
+          href="/"
+          className="inline-block px-6 py-3 bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-semibold rounded-xl transition-all shadow-md shadow-pink-200/50"
+        >
+          Zurück zur Startseite
+        </a>
       </main>
     </div>
   );

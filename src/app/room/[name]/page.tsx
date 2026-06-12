@@ -60,7 +60,7 @@ function RoomContent({ name }: { name: string }) {
           if (isGuest) {
             router.push("/danke");
           } else {
-            router.push("/");
+            router.push("/dashboard");
           }
         });
 
@@ -115,9 +115,9 @@ function RoomContent({ name }: { name: string }) {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-900 p-4">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4">
+        <div className="bg-white border-2 border-pink-100 rounded-2xl shadow-lg shadow-pink-200/50 p-8 text-center max-w-sm">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
               className="w-8 h-8 text-red-500"
               fill="none"
@@ -132,15 +132,15 @@ function RoomContent({ name }: { name: string }) {
               />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
             Fehler aufgetreten
           </h2>
-          <p className="text-gray-400 mb-4">{error}</p>
+          <p className="text-gray-500 mb-4">{error}</p>
           <button
-            onClick={() => router.push(isGuest ? "/danke" : "/")}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            onClick={() => router.push(isGuest ? "/danke" : "/dashboard")}
+            className="px-6 py-2 bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white rounded-xl transition-all"
           >
-            {isGuest ? "Schlie\u00dfen" : "Zur\u00fcck zur Startseite"}
+            {isGuest ? "Schließen" : "Zurück zum Dashboard"}
           </button>
         </div>
       </div>
@@ -148,18 +148,24 @@ function RoomContent({ name }: { name: string }) {
   }
 
   return (
-    <div className="relative min-h-screen bg-gray-900">
+    <div className="relative min-h-screen bg-[#FFF8F0]">
+      {/* Background decorations */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-64 h-64 bg-pink-100 rounded-full opacity-20 blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-100 rounded-full opacity-20 blur-3xl" />
+      </div>
+
       {/* Header with room info */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-gray-900 to-transparent p-4">
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-white to-transparent p-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             {!isGuest && (
               <button
-                onClick={() => router.push("/")}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                onClick={() => router.push("/dashboard")}
+                className="p-2 hover:bg-pink-50 rounded-xl transition-colors"
               >
                 <svg
-                  className="w-5 h-5 text-white"
+                  className="w-5 h-5 text-gray-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -174,20 +180,20 @@ function RoomContent({ name }: { name: string }) {
               </button>
             )}
             <div>
-              <h1 className="text-white font-medium">{name}</h1>
-              <p className="text-gray-400 text-sm">Video Meeting</p>
+              <h1 className="text-gray-800 font-medium">{name}</h1>
+              <p className="text-gray-500 text-sm">Video Meeting</p>
             </div>
           </div>
 
           {!isGuest && (
             <button
               onClick={copyLink}
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-pink-100 hover:border-pink-300 text-gray-700 rounded-xl transition-all shadow-sm"
             >
               {copied ? (
                 <>
                   <svg
-                    className="w-4 h-4"
+                    className="w-4 h-4 text-green-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -226,23 +232,25 @@ function RoomContent({ name }: { name: string }) {
 
       {/* Loading state */}
       {isJoining && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
+        <div className="absolute inset-0 flex items-center justify-center bg-[#FFF8F0] z-20">
           <div className="text-center">
-            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-white text-lg">Verbinde mit {name}...</p>
-            <p className="text-gray-400 text-sm mt-2">
+            <div className="w-16 h-16 border-4 border-pink-300 border-t-pink-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-800 text-lg">Verbinde mit {name}...</p>
+            <p className="text-gray-500 text-sm mt-2">
               Bitte erlaube den Kamera- und Mikrofonzugriff
             </p>
             {roomUrl && (
-              <div className="mt-8 pt-8 border-t border-white/10">
-                <p className="text-gray-500 text-xs mb-2">L&auml;dt nicht? Probiere den direkten Link:</p>
+              <div className="mt-8 pt-8 border-t border-pink-100">
+                <p className="text-gray-400 text-xs mb-2">
+                  Lädt nicht? Probiere den direkten Link:
+                </p>
                 <a
                   href={roomUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 text-sm underline"
+                  className="text-pink-500 hover:text-pink-600 text-sm underline"
                 >
-                  Raum in neuem Tab &ouml;ffnen
+                  Raum in neuem Tab öffnen
                 </a>
               </div>
             )}
@@ -266,8 +274,8 @@ export default function RoomPage({
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-gray-900">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0]">
+          <div className="w-16 h-16 border-4 border-pink-300 border-t-pink-500 rounded-full animate-spin" />
         </div>
       }
     >

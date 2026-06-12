@@ -5,8 +5,9 @@ import ErrorReporter from "@/components/ErrorReporter";
 import Script from "next/script";
 
 export const metadata: Metadata = {
-  title: "One Carbo Meeting",
-  description: "Video-Meeting-Tool von One Carbo - Einfach Räume erstellen und mit Partnern verbinden",
+  title: "Family & Friends - Video Treffen",
+  description:
+    "Der Treffpunkt für Familie und Freunde - Chatten, Videocalls machen und gemeinsame Zeiten finden",
   icons: {
     icon: "/favicon.svg",
   },
