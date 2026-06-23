@@ -1,50 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
-
-const DATA_DIR = path.join(process.cwd(), ".data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
+import { getDb } from "@/app/lib/db";
 
 interface OnlineUser {
   name: string;
-  timezone: "bali" | "austria";
+  timezone: string;
   online: boolean;
   lastSeen: number;
 }
 
-async function ensureDataDir() {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-  } catch {}
-}
+const FIVE_MINUTES = 5 * 60 * 1000;
 
-async function readUsers(): Promise<OnlineUser[]> {
-  try {
-    const data = await fs.readFile(USERS_FILE, "utf-8");
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
-}
-
-async function writeUsers(users: OnlineUser[]) {
-  await ensureDataDir();
-  await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
-}
-
-function cleanupStaleUsers(users: OnlineUser[]): OnlineUser[] {
-  const fiveMinutes = 5 * 60 * 1000;
-  const now = Date.now();
-  return users.filter(
-    (u) => u.online && now - u.lastSeen < fiveMinutes
-  );
+async function listOnline(): Promise<OnlineUser[]> {
+  const db = await getDb();
+  const cutoff = Date.now() - FIVE_MINUTES;
+  // Drop stale rows, then return who's currently online.
+  await db.execute({ sql: "DELETE FROM presence WHERE last_seen < ?", args: [cutoff] });
+  const rs = await db.execute({
+    sql: "SELECT name, timezone, online, last_seen FROM presence WHERE online = 1 AND last_seen >= ?",
+    args: [cutoff],
+  });
+  return rs.rows.map((r) => ({
+    name: String(r.name),
+    timezone: r.timezone == null ? "austria" : String(r.timezone),
+    online: true,
+    lastSeen: Number(r.last_seen),
+  }));
 }
 
 export async function GET() {
-  let users = await readUsers();
-  users = cleanupStaleUsers(users);
-  await writeUsers(users);
-  return NextResponse.json({ users });
+  return NextResponse.json({ users: await listOnline() });
 }
 
 export async function POST(req: NextRequest) {
@@ -53,42 +37,31 @@ export async function POST(req: NextRequest) {
     const { name, timezone, online } = body;
 
     if (!name) {
-      return NextResponse.json(
-        { error: "name is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
 
-    let users = await readUsers();
-    users = cleanupStaleUsers(users);
-
+    const db = await getDb();
     if (online) {
-      // Update or add user
-      const existing = users.find((u) => u.name === name);
-      if (existing) {
-        existing.online = true;
-        existing.lastSeen = Date.now();
-        existing.timezone = timezone || existing.timezone;
-      } else {
-        users.push({
-          name,
-          timezone: timezone || "austria",
-          online: true,
-          lastSeen: Date.now(),
-        });
-      }
+      await db.execute({
+        sql: `INSERT INTO presence (name_lower, name, timezone, online, last_seen)
+              VALUES (?, ?, ?, 1, ?)
+              ON CONFLICT(name_lower) DO UPDATE SET
+                name = excluded.name,
+                timezone = COALESCE(excluded.timezone, presence.timezone),
+                online = 1,
+                last_seen = excluded.last_seen`,
+        args: [String(name).toLowerCase(), name, timezone || "austria", Date.now()],
+      });
     } else {
-      // Remove user
-      users = users.filter((u) => u.name !== name);
+      await db.execute({
+        sql: "DELETE FROM presence WHERE name_lower = ?",
+        args: [String(name).toLowerCase()],
+      });
     }
 
-    await writeUsers(users);
-    return NextResponse.json({ users });
+    return NextResponse.json({ users: await listOnline() });
   } catch (error) {
     console.error("Users API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -1,35 +1,9 @@
-export type TimezoneId = "bali" | "austria";
+// Timezone helpers that work with any IANA zone (e.g. "Europe/Vienna",
+// "Asia/Makassar", "America/New_York") — no fixed set of locations.
 
-export const timezoneIana: Record<TimezoneId, string> = {
-  bali: "Asia/Makassar",
-  austria: "Europe/Vienna",
-};
-
-export const timezoneDisplayName: Record<TimezoneId, string> = {
-  bali: "Bali",
-  austria: "Österreich",
-};
-
-export function getCurrentOffset(tz: TimezoneId): string {
-  const iana = timezoneIana[tz];
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat("en", {
-    timeZone: iana,
-    timeZoneName: "longOffset",
-  });
-  const parts = formatter.formatToParts(now);
-  const offset = parts.find((p) => p.type === "timeZoneName")?.value || "";
-  return offset;
-}
-
-export function getTimezoneLabel(tz: TimezoneId): string {
-  const offset = getCurrentOffset(tz);
-  return `${timezoneDisplayName[tz]} (${offset})`;
-}
-
-export function getTimeInTimezone(tz: TimezoneId): string {
+export function getTimeInTimezone(iana: string): string {
   return new Date().toLocaleTimeString("de-DE", {
-    timeZone: timezoneIana[tz],
+    timeZone: iana,
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -38,42 +12,33 @@ export function getTimeInTimezone(tz: TimezoneId): string {
 export type TimeOfDay = {
   emoji: string;
   label: string;
-  bg: string; // inline style background
 };
 
-export function getTimeOfDay(tz: TimezoneId): TimeOfDay {
-  const tzHour = parseInt(
+function hourNow(iana: string): number {
+  return parseInt(
     new Date().toLocaleTimeString("de-DE", {
-      timeZone: timezoneIana[tz],
+      timeZone: iana,
       hour: "2-digit",
       hour12: false,
     }),
     10
-  );
-
-  if (tzHour >= 6 && tzHour < 12) {
-    return { emoji: "🌅", label: "Morgen", bg: "linear-gradient(135deg, #fbbf24, #fb923c)" };
-  }
-  if (tzHour >= 12 && tzHour < 14) {
-    return { emoji: "☀️", label: "Mittag", bg: "linear-gradient(135deg, #fde047, #fb923c)" };
-  }
-  if (tzHour >= 14 && tzHour < 18) {
-    return { emoji: "⛅", label: "Nachmittag", bg: "linear-gradient(135deg, #fed7aa, #fcd34d)" };
-  }
-  if (tzHour >= 18 && tzHour < 21) {
-    return { emoji: "🌆", label: "Abend", bg: "linear-gradient(135deg, #a5b4fc, #c084fc)" };
-  }
-  return { emoji: "🌙", label: "Nacht", bg: "linear-gradient(135deg, #6366f1, #475569)" };
+  ) % 24;
 }
 
-export function getOffsetMinutes(tz: TimezoneId): number {
-  const iana = timezoneIana[tz];
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat("en", {
+export function getTimeOfDay(iana: string): TimeOfDay {
+  const h = hourNow(iana);
+  if (h >= 6 && h < 12) return { emoji: "🌅", label: "Morgen" };
+  if (h >= 12 && h < 14) return { emoji: "☀️", label: "Mittag" };
+  if (h >= 14 && h < 18) return { emoji: "⛅", label: "Nachmittag" };
+  if (h >= 18 && h < 21) return { emoji: "🌆", label: "Abend" };
+  return { emoji: "🌙", label: "Nacht" };
+}
+
+export function getOffsetMinutes(iana: string): number {
+  const parts = new Intl.DateTimeFormat("en", {
     timeZone: iana,
     timeZoneName: "longOffset",
-  });
-  const parts = formatter.formatToParts(now);
+  }).formatToParts(new Date());
   const tzPart = parts.find((p) => p.type === "timeZoneName")?.value || "";
   const match = tzPart.match(/([+-]\d{1,2}):?(\d{2})?/);
   if (match) {
@@ -84,22 +49,22 @@ export function getOffsetMinutes(tz: TimezoneId): number {
   return 0;
 }
 
-/** Convert a "HH:MM" time string from one timezone to another */
+/** Convert a "HH:MM" time string from one IANA zone to another (today's offsets). */
 export function convertTimeString(
   timeStr: string,
-  fromTz: TimezoneId,
-  toTz: TimezoneId
+  fromIana: string,
+  toIana: string
 ): string {
   const [hStr, mStr = "00"] = timeStr.split(":");
   const hours = parseInt(hStr);
   const minutes = parseInt(mStr);
 
-  const fromOffset = getOffsetMinutes(fromTz);
-  const toOffset = getOffsetMinutes(toTz);
+  const fromOffset = getOffsetMinutes(fromIana);
+  const toOffset = getOffsetMinutes(toIana);
 
   const totalMinutes = hours * 60 + minutes;
   const utcMinutes = totalMinutes - fromOffset;
-  const targetMinutes = ((utcMinutes + toOffset) % 1440 + 1440) % 1440;
+  const targetMinutes = (((utcMinutes + toOffset) % 1440) + 1440) % 1440;
 
   const targetH = Math.floor(targetMinutes / 60);
   const targetM = Math.round(targetMinutes % 60);
@@ -107,49 +72,70 @@ export function convertTimeString(
   return `${String(targetH).padStart(2, "0")}:${String(targetM).padStart(2, "0")}`;
 }
 
-export type OverlapInfo = {
-  austria: string;
-  bali: string;
-  duration: string;
-};
+/** Absolute epoch (ms, UTC) for a wall-clock "YYYY-MM-DDTHH:MM" in a given zone. */
+export function zonedToEpoch(timeStr: string, iana: string): number {
+  const [datePart, timePart] = timeStr.split("T");
+  if (!datePart || !timePart) return NaN;
+  const [y, m, d] = datePart.split("-").map(Number);
+  const [hh, mm] = timePart.split(":").map(Number);
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: iana,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(guess));
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const asUTC = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"));
+  return guess - (asUTC - guess);
+}
 
-/** Berechnet die gemeinsamen Wachstunden (8:00–22:00) zwischen Bali und Österreich */
-export function getOverlapHours(): OverlapInfo | null {
-  const diff = getOffsetMinutes("bali") - getOffsetMinutes("austria");
+/** Local hour (0–23) of an absolute instant in a given zone. */
+export function hourAtEpoch(epoch: number, iana: string): number {
+  if (!Number.isFinite(epoch)) return NaN;
+  return (
+    parseInt(
+      new Date(epoch).toLocaleTimeString("de-DE", {
+        timeZone: iana,
+        hour: "2-digit",
+        hour12: false,
+      }),
+      10
+    ) % 24
+  );
+}
 
-  const awakeStart = 8 * 60; // 8:00
-  const awakeEnd = 22 * 60;  // 22:00
+/** "HH:MM" of an absolute instant in a given zone. */
+export function timeAtEpoch(epoch: number, iana: string): string {
+  if (!Number.isFinite(epoch)) return "--:--";
+  return new Date(epoch).toLocaleTimeString("de-DE", {
+    timeZone: iana,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
 
-  // Bali-Wachzeit in Österreich-Zeit
-  const baliAwakeStartAustria = awakeStart - diff;
-  const baliAwakeEndAustria = awakeEnd - diff;
+/** Reasonable waking window: 07:00–22:59. */
+export function isAwakeHour(hour: number): boolean {
+  return hour >= 7 && hour < 23;
+}
 
-  const overlapStart = Math.max(awakeStart, baliAwakeStartAustria);
-  const overlapEnd = Math.min(awakeEnd, baliAwakeEndAustria);
-
-  if (overlapStart >= overlapEnd) return null;
-
-  const fmt = (m: number) => {
-    const h = Math.floor(m / 60);
-    const min = m % 60;
-    return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-  };
-
-  const duration = Math.round((overlapEnd - overlapStart) / 60);
-  const baliOverlapStart = overlapStart + diff;
-  const baliOverlapEnd = overlapEnd + diff;
-
-  return {
-    austria: `${fmt(overlapStart)}–${fmt(overlapEnd)}`,
-    bali: `${fmt(baliOverlapStart)}–${fmt(baliOverlapEnd)}`,
-    duration: `${duration} Std.`,
-  };
+/** A short, friendly hint about what someone is likely doing at a local hour. */
+export function dayPartHint(hour: number): string {
+  if (hour >= 23 || hour < 6) return "schläft wahrscheinlich 😴";
+  if (hour >= 6 && hour < 8) return "gerade Morgenroutine 🥐";
+  if (hour >= 8 && hour < 15) return "vielleicht Schule/Arbeit 📚";
+  if (hour >= 22) return "macht sich bettfertig 🌙";
+  return "wahrscheinlich wach 🙂";
 }
 
 /** Findet Zeitangaben wie "14:00", "9:30", "1500", "15.00", "14 Uhr", "3pm" im Text */
 export function findTimeInText(text: string): string | null {
   if (!text) return null;
-  // Match "14:00" or "9:30"
   const colonMatch = text.match(/(\d{1,2}):(\d{2})/);
   if (colonMatch) {
     const h = parseInt(colonMatch[1]);
@@ -158,15 +144,11 @@ export function findTimeInText(text: string): string | null {
       return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     }
   }
-  // Match "14 Uhr" or "14Uhr"
   const uhrMatch = text.match(/(\d{1,2})\s*Uhr/i);
   if (uhrMatch) {
     const h = parseInt(uhrMatch[1]);
-    if (h >= 0 && h <= 23) {
-      return `${String(h).padStart(2, "0")}:00`;
-    }
+    if (h >= 0 && h <= 23) return `${String(h).padStart(2, "0")}:00`;
   }
-  // Match "1500" (4 digits that look like a time)
   const fourDigitMatch = text.match(/\b(\d{3,4})\b/);
   if (fourDigitMatch) {
     const num = fourDigitMatch[1];
@@ -184,7 +166,6 @@ export function findTimeInText(text: string): string | null {
       }
     }
   }
-  // Match "3pm" or "3 pm"
   const pmMatch = text.match(/(\d{1,2})\s*(pm|am)\b/i);
   if (pmMatch) {
     let h = parseInt(pmMatch[1]);
@@ -195,52 +176,5 @@ export function findTimeInText(text: string): string | null {
       return `${String(h).padStart(2, "0")}:00`;
     }
   }
-  return null;
-}
-
-/** Prüft ob eine Zeit (HH:MM) in der gemeinsamen Wachzeit liegt */
-export function isTimeInOverlap(timeStr: string, tz: TimezoneId): boolean {
-  const overlap = getOverlapHours();
-  if (!overlap) return true; // wenn kein overlap berechnet werden kann, optimistisch
-
-  const [h, m] = timeStr.split(":").map(Number);
-  const totalMinutes = h * 60 + m;
-
-  const range = tz === "bali" ? overlap.bali : overlap.austria;
-  const parts = range.split("–");
-  if (parts.length !== 2) return true;
-
-  const [startH, startM] = parts[0].split(":").map(Number);
-  const [endH, endM] = parts[1].split(":").map(Number);
-  const startMinutes = startH * 60 + startM;
-  const endMinutes = endH * 60 + endM;
-
-  return totalMinutes >= startMinutes && totalMinutes <= endMinutes;
-}
-
-/** Gibt kontextuelle Hinweise basierend auf den Uhrzeiten (z.B. Schulzeit, Schlafenszeit) */
-export function getTimeContext(austriaTime: string, baliTime: string): string | null {
-  const [aH] = austriaTime.split(":").map(Number);
-  const [bH] = baliTime.split(":").map(Number);
-
-  // Österreich typische Tageszeiten
-  if (aH >= 8 && aH < 15) {
-    return "aber in Österreich vielleicht gerade Schule/Arbeit 📚";
-  }
-  if (aH >= 22 || aH < 6) {
-    return "aber in Österreich schlafen die meisten schon 😴";
-  }
-  if (aH >= 6 && aH < 8) {
-    return "aber in Österreich ist gerade Morgenroutine 🥐";
-  }
-
-  // Bali typische Tageszeiten
-  if (bH >= 8 && bH < 15) {
-    return "aber auf Bali vielleicht gerade Schule/Arbeit 📚";
-  }
-  if (bH >= 22 || bH < 6) {
-    return "aber auf Bali schlafen die meisten schon 😴";
-  }
-
   return null;
 }

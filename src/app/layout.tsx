@@ -8,9 +8,8 @@ export const metadata: Metadata = {
   title: "Family & Friends - Video Treffen",
   description:
     "Der Treffpunkt für Familie und Freunde - Chatten, Videocalls machen und gemeinsame Zeiten finden",
-  icons: {
-    icon: "/favicon.svg",
-  },
+  // Icons are picked up automatically from app/icon.svg and app/apple-icon.png.
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({

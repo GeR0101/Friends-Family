@@ -1,146 +1,181 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  type TimezoneId,
-  getTimezoneLabel,
-} from "../lib/timezone";
-import WorldMap from "../lib/worldmap";
+import { timeAtEpoch } from "../lib/timezone";
+import { type Location, normalizeStoredUser } from "../lib/cities";
+import WorldMap, { type MapPerson } from "../lib/worldmap";
 
 interface User {
   name: string;
-  timezone: TimezoneId;
+  location: Location;
+}
+
+interface Account {
+  name: string;
+  location: Location;
+  online: boolean;
+}
+
+interface Meeting {
+  id: string;
+  roomName: string;
+  startsAt: number;
+  proposer: string;
+  acceptedBy?: string;
+  invitees: string[];
+}
+
+// "in 3 Std 20 Min" / "in 12 Min" / "in 2 Tg 4 Std" / "Läuft gerade"
+function countdownLabel(startsAt: number): string {
+  const diff = startsAt - Date.now();
+  if (diff <= 0) return "Läuft gerade";
+  const mins = Math.round(diff / 60000);
+  if (mins < 60) return `in ${mins} Min`;
+  const h = Math.floor(mins / 60);
+  const mm = mins % 60;
+  if (h < 24) return mm ? `in ${h} Std ${mm} Min` : `in ${h} Std`;
+  const days = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh ? `in ${days} ${days === 1 ? "Tag" : "Tg"} ${rh} Std` : `in ${days} ${days === 1 ? "Tag" : "Tg"}`;
+}
+
+// Day label ("Heute" / "Morgen" / "Mi, 18.06.") in the viewer's own timezone.
+function dayLabel(startsAt: number, iana: string): string {
+  const ymd = (ms: number) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: iana }).format(new Date(ms));
+  const target = ymd(startsAt);
+  if (target === ymd(Date.now())) return "Heute";
+  if (target === ymd(Date.now() + 86400000)) return "Morgen";
+  return new Intl.DateTimeFormat("de-DE", {
+    timeZone: iana,
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(new Date(startsAt));
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [roomName, setRoomName] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [, setNowTick] = useState(0);
 
   useEffect(() => {
-    const saved = localStorage.getItem("ff_user");
-    if (!saved) {
+    const u = normalizeStoredUser(localStorage.getItem("ff_user"));
+    if (!u) {
       router.push("/");
       return;
     }
-    setUser(JSON.parse(saved));
+    setUser(u);
 
-    // Announce online status
-    const savedUser = JSON.parse(saved);
-    fetch("/api/chat/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: savedUser.name,
-        timezone: savedUser.timezone,
-        online: true,
-      }),
-    });
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/chat/users");
-        const data = await res.json();
-        setOnlineUsers(
-          data.users
-            .filter((u: any) => u.online)
-            .map((u: any) => u.name)
-        );
-      } catch {}
-    }, 3000);
-
-    // Set offline on unmount
-    return () => {
-      clearInterval(interval);
+    const beat = (online: boolean) =>
       fetch("/api/chat/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: savedUser.name,
-          timezone: savedUser.timezone,
-          online: false,
-        }),
-      });
+        body: JSON.stringify({ name: u.name, timezone: u.location.tz, online }),
+      }).catch(() => {});
+    beat(true);
+
+    const interval = setInterval(async () => {
+      try {
+        const [pres, accs] = await Promise.all([
+          fetch("/api/chat/users").then((r) => r.json()),
+          fetch("/api/accounts").then((r) => r.json()),
+        ]);
+        setOnlineUsers(pres.users.filter((x: any) => x.online).map((x: any) => x.name));
+        setAccounts(accs.users || []);
+      } catch {}
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+      beat(false);
     };
   }, [router]);
+
+  // Upcoming (accepted) meetings + a ticker so the countdown stays fresh.
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/meetings?user=${encodeURIComponent(user.name)}`);
+        const data = await res.json();
+        setMeetings(data.meetings || []);
+      } catch {}
+    };
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, [user]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   const handleLogout = () => {
     if (user) {
       fetch("/api/chat/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: user.name,
-          timezone: user.timezone,
-          online: false,
-        }),
+        body: JSON.stringify({ name: user.name, timezone: user.location.tz, online: false }),
       });
     }
     localStorage.removeItem("ff_user");
     router.push("/");
   };
 
-  const createVideoRoom = async () => {
-    if (!user) return;
-    setIsCreating(true);
-    try {
-      const res = await fetch("/api/rooms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: roomName || undefined }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        // Send a chat message that you started a room
-        await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user: user.name,
-            text: `📹 Hat einen Video-Raum erstellt: "${data.name}"`,
-            timezone: user.timezone,
-          }),
-        });
-        router.push(`/room/${data.name}`);
-      }
-    } catch {}
-    setIsCreating(false);
-  };
+  // Everyone (incl. me) shown on the map at their real location.
+  const mapPeople: MapPerson[] = useMemo(() => {
+    const src = accounts.length
+      ? accounts
+      : user
+      ? [{ name: user.name, location: user.location, online: true }]
+      : [];
+    return src.map((a) => ({
+      name: a.name,
+      lat: a.location.lat,
+      lon: a.location.lon,
+      tz: a.location.tz,
+      flag: a.location.flag,
+    }));
+  }, [accounts, user]);
 
   if (!user) return null;
 
   return (
-    <div className="min-h-screen p-4">
+    <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-b from-orange-50/40 via-rose-50/30 to-violet-50/40">
       {/* Background decorations */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-64 h-64 bg-pink-100 rounded-full opacity-20 blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-100 rounded-full opacity-20 blur-3xl" />
+        <div className="absolute top-0 left-0 w-64 h-64 bg-orange-100 rounded-full opacity-30 blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-violet-100 rounded-full opacity-30 blur-3xl" />
       </div>
 
       <div className="relative max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-purple-400 rounded-xl flex items-center justify-center shadow-md shadow-pink-200">
-              <span className="text-white font-bold text-lg">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-violet-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg shadow-violet-200">
+              <span className="text-white font-bold text-xl">
                 {user.name.charAt(0).toUpperCase()}
               </span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">
-                Hallo, {user.name}! 👋
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
+                Hallo, {user.name}! <span className="inline-block">👋</span>
               </h1>
-              <p className="text-sm text-gray-500">
-                {getTimezoneLabel(user.timezone)}
+              <p className="text-base text-gray-400">
+                Schön, dass du da bist.
               </p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+            aria-label="Abmelden"
+            className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-50 rounded-full shadow-sm ring-1 ring-black/5 transition-all"
           >
             <svg
               className="w-5 h-5"
@@ -159,18 +194,92 @@ export default function DashboardPage() {
         </div>
 
         {/* World map with day/night */}
-        <WorldMap />
+        <WorldMap people={mapPeople} />
+
+        {/* Upcoming meetings */}
+        {meetings.length > 0 && (
+          <div className="bg-white rounded-3xl p-5 mb-5 shadow-sm ring-1 ring-black/5">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-100 to-pink-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.8}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-gray-800">Anstehende Treffen</h2>
+            </div>
+            <div className="space-y-2.5">
+              {meetings.map((mt) => {
+                const myTime = timeAtEpoch(mt.startsAt, user.location.tz);
+                const soon = mt.startsAt - Date.now() < 60 * 60 * 1000;
+                const live = mt.startsAt - Date.now() <= 0;
+                return (
+                  <div
+                    key={mt.id}
+                    className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-r from-violet-50/70 to-pink-50/70 ring-1 ring-violet-100"
+                  >
+                    <div className="flex flex-col items-center justify-center w-16 flex-shrink-0 rounded-xl bg-white py-2 shadow-sm ring-1 ring-black/5">
+                      <span className="text-lg font-bold leading-none text-gray-800">{myTime}</span>
+                      <span className="mt-0.5 text-[10px] text-gray-400">{user.location.flag} Uhr</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-gray-800">{dayLabel(mt.startsAt, user.location.tz)}</p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            live
+                              ? "bg-green-100 text-green-700"
+                              : soon
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-violet-100 text-violet-700"
+                          }`}
+                        >
+                          {countdownLabel(mt.startsAt)}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-gray-400">
+                        mit {mt.invitees.length ? mt.invitees.join(", ") : "der ganzen Familie"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => router.push(`/room/${mt.roomName}`)}
+                      className="flex-shrink-0 rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:from-pink-600 hover:to-violet-600"
+                    >
+                      {live ? "Beitreten" : "Eintreten"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Online users */}
-        <div className="bg-white border-2 border-pink-100 rounded-2xl p-4 mb-4 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-            <h2 className="font-semibold text-gray-700">Online</h2>
+        <div className="bg-white rounded-3xl p-5 mb-5 shadow-sm ring-1 ring-black/5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+              <h2 className="text-lg font-bold text-gray-800">Online</h2>
+            </div>
+            <div className="w-10 h-10 flex items-center justify-center rounded-full ring-1 ring-black/5 text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-1.5-5.6"
+                />
+              </svg>
+            </div>
           </div>
           {onlineUsers.length === 0 ? (
-            <p className="text-gray-400 text-sm">Niemand ist online...</p>
+            <p className="text-gray-400">Niemand ist online...</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-1">
               {onlineUsers.map((name) => (
                 <div
                   key={name}
@@ -185,16 +294,16 @@ export default function DashboardPage() {
         </div>
 
         {/* Main action cards */}
-        <div className="grid gap-4 mb-4">
+        <div className="grid gap-5 mb-5">
           {/* Chat Card */}
           <button
             onClick={() => router.push("/chat")}
-            className="bg-white border-2 border-purple-100 rounded-2xl p-6 text-left hover:border-purple-300 hover:shadow-md hover:shadow-purple-100 transition-all group"
+            className="bg-white rounded-3xl p-6 text-left shadow-sm ring-1 ring-black/5 hover:shadow-md hover:ring-violet-200 transition-all group"
           >
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-400 rounded-2xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 bg-gradient-to-br from-violet-100 to-purple-100 rounded-2xl flex items-center justify-center transition-all">
                 <svg
-                  className="w-7 h-7 text-white"
+                  className="w-8 h-8 text-violet-500"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -202,21 +311,21 @@ export default function DashboardPage() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={1.5}
+                    strokeWidth={1.8}
                     d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
                   />
                 </svg>
               </div>
               <div className="flex-1">
-                <h2 className="text-lg font-bold text-gray-800 mb-1">
+                <h2 className="text-xl font-bold text-gray-800 mb-1">
                   Chat & Zeiten planen
                 </h2>
-                <p className="text-gray-500 text-sm">
+                <p className="text-gray-400">
                   Schnacken und gemeinsame Zeiten finden – mit Zeitumrechnung!
                 </p>
               </div>
               <svg
-                className="w-5 h-5 text-gray-300 group-hover:text-purple-400 group-hover:translate-x-1 transition-all"
+                className="w-6 h-6 text-gray-300 group-hover:text-violet-400 group-hover:translate-x-1 transition-all"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -230,58 +339,8 @@ export default function DashboardPage() {
               </svg>
             </div>
           </button>
-
-          {/* Video Call Card */}
-          <div className="bg-white border-2 border-pink-100 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-pink-400 to-rose-400 rounded-2xl flex items-center justify-center shadow-sm">
-                <svg
-                  className="w-7 h-7 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 mb-1">
-                  Video-Meeting
-                </h2>
-                <p className="text-gray-500 text-sm">
-                  Starte oder erstelle einen Video-Raum
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={roomName}
-                onChange={(e) => setRoomName(e.target.value)}
-                placeholder="Raumname (optional)"
-                className="flex-1 px-4 py-2.5 border-2 border-pink-100 rounded-xl focus:ring-2 focus:ring-pink-300 focus:border-pink-300 bg-pink-50/50 text-gray-800 placeholder-gray-400 transition-all text-sm"
-                onKeyDown={(e) => e.key === "Enter" && createVideoRoom()}
-              />
-              <button
-                onClick={createVideoRoom}
-                disabled={isCreating}
-                className="px-5 py-2.5 bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all shadow-sm shadow-pink-200/50 flex items-center gap-2 text-sm"
-              >
-                {isCreating ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  "Los geht's!"
-                )}
-              </button>
-            </div>
-          </div>
         </div>
+
       </div>
     </div>
   );
