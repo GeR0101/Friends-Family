@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Friends & Family",
-    short_name: "Friends & Family",
+    name: "Hello Tropics",
+    short_name: "Hello Tropics",
     description:
       "Der Treffpunkt für Familie und Freunde – Chatten, Videocalls machen und gemeinsame Zeiten finden",
     start_url: "/",

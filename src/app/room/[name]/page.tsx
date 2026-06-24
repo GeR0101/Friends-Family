@@ -462,11 +462,11 @@ function RoomContent({ name }: { name: string }) {
               </div>
             )}
 
-            {/* Invite friends outside of Friends & Family */}
+            {/* Invite friends outside of Hello Tropics */}
             <div className="col-span-full flex flex-col items-center gap-2.5 rounded-2xl bg-white/60 px-4 py-3 text-center ring-1 ring-black/5">
               <p className="text-sm text-gray-500">
                 Freunde außerhalb von{" "}
-                <span className="font-medium text-gray-700">Friends &amp; Family</span>?
+                <span className="font-medium text-gray-700">Hello Tropics</span>?
                 Teile den Einladungslink mit ihnen.
               </p>
               <button

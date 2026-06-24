@@ -27,11 +27,13 @@ import {
 interface User {
   name: string;
   location: Location;
+  avatar?: string;
 }
 
 interface Contact {
   name: string;
   location: Location;
+  avatar?: string;
   online: boolean;
   lastSeen: number;
 }
@@ -89,6 +91,41 @@ function avatarGradient(name: string) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return gradients[h % gradients.length];
+}
+
+// Round avatar: shows the person's photo if set, otherwise a gradient initial.
+function Avatar({
+  name,
+  avatar,
+  className = "w-12 h-12",
+  textClassName = "",
+}: {
+  name: string;
+  avatar?: string;
+  className?: string;
+  textClassName?: string;
+}) {
+  if (avatar) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={avatar}
+        alt={name}
+        className={`${className} rounded-full object-cover`}
+      />
+    );
+  }
+  return (
+    <div
+      className={`${className} rounded-full bg-gradient-to-br ${avatarGradient(
+        name
+      )} flex items-center justify-center`}
+    >
+      <span className={`text-white font-bold ${textClassName}`}>
+        {name.charAt(0).toUpperCase()}
+      </span>
+    </div>
+  );
 }
 
 // Friendly day label ("Heute" / "Morgen" / "Mi, 18.06.") in a given zone.
@@ -309,6 +346,12 @@ export default function ChatPage() {
       ? user.location
       : contacts.find((c) => c.name.toLowerCase() === name.toLowerCase())?.location;
 
+  // Resolve a participant's profile photo by name (self or a known contact).
+  const avatarFor = (name: string): string | undefined =>
+    name.toLowerCase() === user.name.toLowerCase()
+      ? user.avatar
+      : contacts.find((c) => c.name.toLowerCase() === name.toLowerCase())?.avatar;
+
   return (
     <div className="min-h-screen sm:p-6 bg-gradient-to-b from-orange-50/40 via-rose-50/30 to-violet-50/40">
       <div className="fixed inset-0 pointer-events-none">
@@ -381,13 +424,7 @@ export default function ChatPage() {
                 }`}
               >
                 <div className="relative flex-shrink-0">
-                  <div
-                    className={`w-12 h-12 rounded-full bg-gradient-to-br ${avatarGradient(
-                      c.name
-                    )} flex items-center justify-center`}
-                  >
-                    <span className="text-white font-bold">{c.name.charAt(0).toUpperCase()}</span>
-                  </div>
+                  <Avatar name={c.name} avatar={c.avatar} className="w-12 h-12" />
                   {c.online && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 border-2 border-white rounded-full" />
                   )}
@@ -463,15 +500,12 @@ export default function ChatPage() {
                 ) : (
                   <>
                     <div className="relative flex-shrink-0">
-                      <div
-                        className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGradient(
-                          selected.name
-                        )} flex items-center justify-center`}
-                      >
-                        <span className="text-white font-bold text-sm">
-                          {selected.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
+                      <Avatar
+                        name={selected.name}
+                        avatar={avatarFor(selected.name)}
+                        className="w-10 h-10"
+                        textClassName="text-sm"
+                      />
                       {activeContact?.online && (
                         <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white rounded-full" />
                       )}
@@ -503,7 +537,15 @@ export default function ChatPage() {
                 {messages.map((msg) => {
                   const isOwn = msg.user === user.name;
                   return (
-                    <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+                    <div key={msg.id} className={`flex gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
+                      {!isOwn && selected.type === "group" && (
+                        <Avatar
+                          name={msg.user}
+                          avatar={avatarFor(msg.user)}
+                          className="w-8 h-8 mt-5 flex-shrink-0"
+                          textClassName="text-xs"
+                        />
+                      )}
                       <div className="max-w-[85%]">
                         {!isOwn && selected.type === "group" && (
                           <p className="text-xs font-medium text-gray-500 mb-1 ml-1">{msg.user}</p>
@@ -733,13 +775,12 @@ export default function ChatPage() {
                                   : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
                               }`}
                             >
-                              <span
-                                className={`flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br ${avatarGradient(
-                                  c.name
-                                )} text-[10px] font-bold text-white`}
-                              >
-                                {c.name.charAt(0).toUpperCase()}
-                              </span>
+                              <Avatar
+                                name={c.name}
+                                avatar={c.avatar}
+                                className="h-5 w-5"
+                                textClassName="text-[10px]"
+                              />
                               {c.name}
                               {on && (
                                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -19,7 +19,7 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Friends & Family - Video Treffen",
+  title: "Hello Tropics – Video Treffen",
   description:
     "Der Treffpunkt für Familie und Freunde - Chatten, Videocalls machen und gemeinsame Zeiten finden",
   // Icons are picked up automatically from app/icon.svg and app/apple-icon.png.

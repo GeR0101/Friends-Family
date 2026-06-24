@@ -175,11 +175,11 @@ export default function AuthPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/bird.png"
-              alt="Friends & Family"
+              alt="Hello Tropics"
               className="w-24 h-24 rounded-2xl object-cover mx-auto mb-4 shadow-md shadow-violet-200"
             />
             <h1 className="font-display text-3xl font-semibold text-gray-800 mb-1 tracking-tight lowercase">
-              friends &amp; family
+              hello tropics
             </h1>
             <p className="text-gray-500">
               {mode === "login"
