@@ -277,9 +277,10 @@ export default function ChatPage() {
         : [...prev, name]
     );
 
-  const proposeMeeting = () => {
+  const proposeMeeting = (startsAtOverride?: number) => {
     if (!user) return;
-    const startsAt = zonedToEpoch(`${selectedDate}T${selectedTime}`, user.location.tz);
+    const startsAt =
+      startsAtOverride ?? zonedToEpoch(`${selectedDate}T${selectedTime}`, user.location.tz);
     const proposal: MeetingProposal = { startsAt, proposedByTz: user.location.tz };
     const invitees = inviteSel.filter((n) => n.toLowerCase() !== user.name.toLowerCase());
     if (invitees.length > 0) proposal.invitees = invitees;
@@ -293,6 +294,9 @@ export default function ChatPage() {
     }
     sendMessage("", proposal, undefined, target);
   };
+
+  // "Jetzt" → propose a meeting starting right now.
+  const proposeNow = () => proposeMeeting(Date.now());
 
   // Accept a meeting proposal → creates the room and turns the card into a
   // "join now" card for everyone in the conversation.
@@ -900,6 +904,22 @@ export default function ChatPage() {
                       </p>
                     </div>
                   )}
+
+                  {/* Jetzt sofort treffen */}
+                  <button
+                    onClick={proposeNow}
+                    disabled={sending}
+                    className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 py-2.5 font-semibold text-white shadow-sm transition-all hover:from-emerald-600 hover:to-green-600 disabled:opacity-50"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                    Jetzt treffen
+                  </button>
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="h-px flex-1 bg-gray-100" />
+                    <span className="text-[11px] text-gray-400">oder für später planen</span>
+                    <span className="h-px flex-1 bg-gray-100" />
+                  </div>
+
                   <div className="flex gap-3 mb-3">
                     <div className="flex-1">
                       <label className="block text-xs text-gray-500 mb-1">Tag</label>

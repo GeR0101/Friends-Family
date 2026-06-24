@@ -77,12 +77,17 @@ function VideoTile({
     const el = videoRef.current;
     if (!el) return;
     el.srcObject = videoTrack ? new MediaStream([videoTrack]) : null;
+    // Re-trigger playback — needed when the camera is toggled back on or the
+    // element remounts (mobile browsers don't always auto-resume).
+    if (videoTrack) el.play().catch(() => {});
   }, [videoTrack]);
 
   useEffect(() => {
     const el = audioRef.current;
     if (!el || isLocal) return; // never play our own audio back (echo)
     el.srcObject = audioTrack ? new MediaStream([audioTrack]) : null;
+    // Explicit play() so remote audio is heard on mobile (autoplay is flaky).
+    if (audioTrack) el.play().catch(() => {});
   }, [audioTrack, isLocal]);
 
   const name = participant.user_name || (isLocal ? "Du" : "Gast");
@@ -241,6 +246,12 @@ function RoomContent({ name }: { name: string }) {
           // local first, then guests by join order
           all.sort((a, b) => (a.local === b.local ? 0 : a.local ? -1 : 1));
           setParticipants(all);
+          // Keep the mic/cam buttons in sync with the real local track state.
+          const local = all.find((p) => p.local);
+          if (local) {
+            setMicOn(local.audio);
+            setCamOn(local.video);
+          }
         };
 
         co.on("joined-meeting", () => {
@@ -276,13 +287,17 @@ function RoomContent({ name }: { name: string }) {
   }, [name, userName]);
 
   const toggleMic = () => {
-    const next = !micOn;
-    callRef.current?.setLocalAudio(next);
+    const co = callRef.current;
+    if (!co) return;
+    const next = !co.localAudio(); // read real state to avoid desync
+    co.setLocalAudio(next);
     setMicOn(next);
   };
   const toggleCam = () => {
-    const next = !camOn;
-    callRef.current?.setLocalVideo(next);
+    const co = callRef.current;
+    if (!co) return;
+    const next = !co.localVideo();
+    co.setLocalVideo(next);
     setCamOn(next);
   };
 

@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { timeAtEpoch, hourAtEpoch, isAwakeHour, getTimeOfDay } from "../lib/timezone";
+import { timeAtEpoch } from "../lib/timezone";
 import { type Location, normalizeStoredUser } from "../lib/cities";
-import { dmId } from "../lib/conversation";
 import WorldMap, { type MapPerson } from "../lib/worldmap";
 
 interface User {
@@ -351,7 +350,6 @@ export default function DashboardPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [knocked, setKnocked] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   // "Set a security question" prompt (for accounts created before the feature)
@@ -507,28 +505,6 @@ export default function DashboardPage() {
       setSecError("Verbindungsfehler – bitte nochmal versuchen");
     }
     setSecSaving(false);
-  };
-
-  // Friendly "knock" — a gentle DM asking if it's a good time, instead of
-  // starting a call out of the blue.
-  const handleKnock = async (name: string) => {
-    if (!user) return;
-    setKnocked(name);
-    try {
-      await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: user.name,
-          text: `👋 ${user.name} klopft an – Zeit für ein kurzes Hallo?`,
-          conversationId: dmId(user.name, name),
-          timezone: user.location.tz,
-        }),
-      });
-    } catch {
-      /* ignore */
-    }
-    setTimeout(() => setKnocked((k) => (k === name ? null : k)), 4000);
   };
 
   const handleLogout = () => {
@@ -813,76 +789,6 @@ export default function DashboardPage() {
 
         {/* World map with day/night */}
         <WorldMap people={mapPeople} />
-
-        {/* "Is now a good moment?" — quick availability + gentle knock */}
-        {(() => {
-          const others = accounts.filter(
-            (a) => a.name.toLowerCase() !== user.name.toLowerCase()
-          );
-          if (others.length === 0) return null;
-          return (
-            <div className="bg-white rounded-3xl p-5 mb-5 shadow-sm ring-1 ring-black/5">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center">
-                  <span className="text-lg leading-none">🙋</span>
-                </div>
-                <div>
-                  <h2 className="font-display font-semibold text-gray-800">Guter Moment?</h2>
-                  <p className="text-xs text-gray-400">Wer ist gerade wach – klopf einfach an</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {others.map((a) => {
-                  const hour = hourAtEpoch(Date.now(), a.location.tz);
-                  const awake = isAwakeHour(hour);
-                  const online = onlineUsers.some(
-                    (n) => n.toLowerCase() === a.name.toLowerCase()
-                  );
-                  const verdict = online && awake
-                    ? { label: "gerade da", cls: "bg-green-100 text-green-700" }
-                    : awake
-                    ? { label: "wach", cls: "bg-amber-100 text-amber-700" }
-                    : { label: "schläft evtl.", cls: "bg-gray-100 text-gray-400" };
-                  return (
-                    <div key={a.name} className="flex items-center gap-3 rounded-2xl bg-gray-50/70 px-3 py-2">
-                      <div className="relative flex-shrink-0">
-                        {a.avatar ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={a.avatar} alt={a.name} className="w-10 h-10 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center text-white font-bold">
-                            {a.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        {online && (
-                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white rounded-full" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-gray-800 truncate text-sm">{a.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {a.location.flag} {timeAtEpoch(Date.now(), a.location.tz)} Uhr ·{" "}
-                          {getTimeOfDay(a.location.tz).emoji}
-                        </p>
-                      </div>
-                      <span className={`flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${verdict.cls}`}>
-                        {verdict.label}
-                      </span>
-                      <button
-                        onClick={() => handleKnock(a.name)}
-                        disabled={knocked === a.name}
-                        className="flex-shrink-0 rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:from-pink-600 hover:to-violet-600 disabled:opacity-60"
-                      >
-                        {knocked === a.name ? "Angeklopft 👋" : "Anklopfen"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
 
         {/* Upcoming meetings */}
         {meetings.length > 0 && (
