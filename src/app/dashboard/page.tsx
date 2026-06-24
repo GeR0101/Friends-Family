@@ -350,6 +350,7 @@ export default function DashboardPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [deletingMeeting, setDeletingMeeting] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   // "Set a security question" prompt (for accounts created before the feature)
@@ -379,6 +380,8 @@ export default function DashboardPage() {
 
     const interval = setInterval(async () => {
       try {
+        // Keep our own presence fresh on every tick so we don't flicker out.
+        beat(true);
         const [pres, accs] = await Promise.all([
           fetch("/api/chat/users").then((r) => r.json()),
           fetch("/api/accounts").then((r) => r.json()),
@@ -505,6 +508,18 @@ export default function DashboardPage() {
       setSecError("Verbindungsfehler – bitte nochmal versuchen");
     }
     setSecSaving(false);
+  };
+
+  // Cancel a planned meeting (deletes the underlying proposal everywhere).
+  const deleteMeeting = async (id: string) => {
+    setDeletingMeeting(id);
+    try {
+      await fetch(`/api/chat?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      setMeetings((m) => m.filter((x) => x.id !== id));
+    } catch {
+      /* ignore */
+    }
+    setDeletingMeeting(null);
   };
 
   const handleLogout = () => {
@@ -790,6 +805,41 @@ export default function DashboardPage() {
         {/* World map with day/night */}
         <WorldMap people={mapPeople} />
 
+        {/* Online users */}
+        <div className="bg-white rounded-3xl p-5 mb-5 shadow-sm ring-1 ring-black/5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+              <h2 className="text-lg font-bold text-gray-800">Online</h2>
+            </div>
+            <div className="w-10 h-10 flex items-center justify-center rounded-full ring-1 ring-black/5 text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-1.5-5.6"
+                />
+              </svg>
+            </div>
+          </div>
+          {onlineUsers.length === 0 ? (
+            <p className="text-gray-400">Niemand ist online...</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 mt-1">
+              {onlineUsers.map((name) => (
+                <div
+                  key={name}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full text-sm text-green-700"
+                >
+                  <div className="w-2 h-2 bg-green-400 rounded-full" />
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Upcoming meetings */}
         {meetings.length > 0 && (
           <div className="bg-white rounded-3xl p-5 mb-5 shadow-sm ring-1 ring-black/5">
@@ -845,47 +895,27 @@ export default function DashboardPage() {
                     >
                       {live ? "Beitreten" : "Eintreten"}
                     </button>
+                    <button
+                      onClick={() => deleteMeeting(mt.id)}
+                      disabled={deletingMeeting === mt.id}
+                      aria-label="Treffen löschen"
+                      title="Treffen löschen"
+                      className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
+                    >
+                      {deletingMeeting === mt.id ? (
+                        <span className="w-4 h-4 border-2 border-rose-300 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-1 0v12a1 1 0 01-1 1H10a1 1 0 01-1-1V7h6z" />
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 );
               })}
             </div>
           </div>
         )}
-
-        {/* Online users */}
-        <div className="bg-white rounded-3xl p-5 mb-5 shadow-sm ring-1 ring-black/5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-              <h2 className="text-lg font-bold text-gray-800">Online</h2>
-            </div>
-            <div className="w-10 h-10 flex items-center justify-center rounded-full ring-1 ring-black/5 text-gray-400">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.8}
-                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-1.5-5.6"
-                />
-              </svg>
-            </div>
-          </div>
-          {onlineUsers.length === 0 ? (
-            <p className="text-gray-400">Niemand ist online...</p>
-          ) : (
-            <div className="flex flex-wrap gap-2 mt-1">
-              {onlineUsers.map((name) => (
-                <div
-                  key={name}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full text-sm text-green-700"
-                >
-                  <div className="w-2 h-2 bg-green-400 rounded-full" />
-                  {name}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Main action cards */}
         <div className="grid gap-5 mb-5">
@@ -911,12 +941,9 @@ export default function DashboardPage() {
                 </svg>
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-800 mb-1">
+                <h2 className="text-xl font-bold text-gray-800">
                   Chat & Zeiten planen
                 </h2>
-                <p className="text-gray-400">
-                  Schnacken und gemeinsame Zeiten finden – mit Zeitumrechnung!
-                </p>
               </div>
               <svg
                 className="w-6 h-6 text-gray-300 group-hover:text-violet-400 group-hover:translate-x-1 transition-all"

@@ -96,7 +96,13 @@ const NIGHT_BG = { r: 233, g: 228, b: 252 };  // soft violet
 const DAY_DOT = { r: 150, g: 134, b: 110 };   // warm grey
 const NIGHT_DOT = { r: 140, g: 132, b: 182 }; // cool violet-grey
 
-export default function WorldMap({ people = [] }: { people?: MapPerson[] }) {
+export default function WorldMap({
+  people = [],
+  compact = false,
+}: {
+  people?: MapPerson[];
+  compact?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [times, setTimes] = useState<Record<string, string>>({});
   const [personDay, setPersonDay] = useState<Record<string, boolean>>({});
@@ -290,7 +296,11 @@ export default function WorldMap({ people = [] }: { people?: MapPerson[] }) {
   }, [peopleKey]);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-white/60 shadow-sm mb-5 bg-gradient-to-br from-orange-50 to-violet-50">
+    <div
+      className={`relative overflow-hidden border border-white/60 bg-gradient-to-br from-orange-50 to-violet-50 ${
+        compact ? "rounded-2xl" : "rounded-3xl shadow-sm mb-5"
+      }`}
+    >
       <canvas
         ref={canvasRef}
         width={1000}
@@ -298,8 +308,8 @@ export default function WorldMap({ people = [] }: { people?: MapPerson[] }) {
         className="w-full block"
       />
 
-      {/* Cluster labels — one combined card per spot so they never overlap */}
-      {clusters.map((c) => {
+      {/* Cluster labels — hidden in compact mode (too cramped) */}
+      {!compact && clusters.map((c) => {
         const x = ((c.lon + 180) / 360) * 100;
         const y = ((LAT_TOP - c.lat) / LAT_SPAN) * 100;
         const isDay = personDay[c.key];

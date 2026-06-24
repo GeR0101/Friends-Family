@@ -23,6 +23,7 @@ import {
   dmId,
   type Selection,
 } from "../lib/conversation";
+import WorldMap, { type MapPerson } from "../lib/worldmap";
 
 interface User {
   name: string;
@@ -281,18 +282,19 @@ export default function ChatPage() {
     if (!user) return;
     const startsAt =
       startsAtOverride ?? zonedToEpoch(`${selectedDate}T${selectedTime}`, user.location.tz);
-    const proposal: MeetingProposal = { startsAt, proposedByTz: user.location.tz };
     const invitees = inviteSel.filter((n) => n.toLowerCase() !== user.name.toLowerCase());
-    if (invitees.length > 0) proposal.invitees = invitees;
+    const proposal: MeetingProposal = { startsAt, proposedByTz: user.location.tz };
+    // List everyone involved on the card (so all timezones show) when >1.
+    if (invitees.length > 1) proposal.invitees = invitees;
 
-    // More than one invitee → post into the shared family thread so everyone
-    // selected sees it; otherwise keep it in the current conversation.
-    let target = conversationId!;
-    if (invitees.length > 1) {
-      target = GROUP_ID;
-      setSelected({ type: "group" });
+    if (invitees.length === 0) {
+      // Nobody picked → keep it in the current direct chat.
+      sendMessage("", proposal, undefined, conversationId!);
+      return;
     }
-    sendMessage("", proposal, undefined, target);
+    // Send the proposal into each invited person's direct chat.
+    invitees.forEach((inv) => sendMessage("", { ...proposal }, undefined, dmId(user.name, inv)));
+    setSelected({ type: "dm", name: invitees[0] });
   };
 
   // "Jetzt" → propose a meeting starting right now.
@@ -381,6 +383,18 @@ export default function ChatPage() {
 
   const otherContacts = contacts.filter((c) => c.name.toLowerCase() !== user.name.toLowerCase());
 
+  // Everyone (incl. me) for the little day/night map in the sidebar.
+  const mapPeople: MapPerson[] = (contacts.length
+    ? contacts
+    : [{ name: user.name, location: user.location, online: true, lastSeen: 0 }]
+  ).map((c) => ({
+    name: c.name,
+    lat: c.location.lat,
+    lon: c.location.lon,
+    tz: c.location.tz,
+    flag: c.location.flag,
+  }));
+
   // Resolve a participant's location by name (self or a known contact).
   const locFor = (name: string): Location | undefined =>
     name.toLowerCase() === user.name.toLowerCase()
@@ -420,34 +434,12 @@ export default function ChatPage() {
             <h1 className="text-lg font-bold text-gray-800">Chats</h1>
           </div>
 
+          {/* Little day/night world map — a glance at where everyone is */}
+          <div className="px-3 pt-3">
+            <WorldMap people={mapPeople} compact />
+          </div>
+
           <div className="flex-1 overflow-y-auto py-2">
-            {/* Group conversation */}
-            <button
-              onClick={() => setSelected({ type: "group" })}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                selected?.type === "group" ? "bg-violet-50" : "hover:bg-gray-50"
-              }`}
-            >
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-violet-500 flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.8}
-                    d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-1.5-5.6"
-                  />
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-gray-800 truncate">{GROUP_NAME}</p>
-                <p className="text-xs text-gray-400 truncate">Alle zusammen</p>
-              </div>
-            </button>
-
-            <div className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-300">
-              Direktnachrichten
-            </div>
-
             {otherContacts.length === 0 && (
               <p className="px-4 py-3 text-sm text-gray-400">
                 Noch niemand sonst registriert.

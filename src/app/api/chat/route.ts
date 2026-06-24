@@ -128,6 +128,22 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
+// Delete a message (e.g. cancel a planned meeting).
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+  try {
+    const db = await getDb();
+    await db.execute({ sql: "DELETE FROM messages WHERE id = ?", args: [id] });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Chat DELETE error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
