@@ -156,14 +156,14 @@ export function resolveLocation(input: unknown): Location | null {
 // Normalise the localStorage `ff_user` blob across old/new formats.
 export function normalizeStoredUser(
   raw: string | null
-): { name: string; location: Location } | null {
+): { name: string; location: Location; avatar?: string } | null {
   if (!raw) return null;
   try {
     const obj = JSON.parse(raw);
     if (!obj?.name) return null;
     const location = resolveLocation(obj.location ?? obj.timezone);
     if (!location) return null;
-    return { name: obj.name, location };
+    return { name: obj.name, location, avatar: obj.avatar };
   } catch {
     return null;
   }

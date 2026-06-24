@@ -8,12 +8,14 @@ export interface Account {
   salt: string;
   hash: string;
   location: Location;
+  avatar?: string;
   createdAt: number;
 }
 
 export interface PublicAccount {
   name: string;
   location: Location;
+  avatar?: string;
   createdAt: number;
 }
 
@@ -24,6 +26,7 @@ function rowToAccount(r: Row): Account {
     salt: String(r.salt),
     hash: String(r.hash),
     location: loc || resolveLocation("austria")!,
+    avatar: r.avatar == null ? undefined : String(r.avatar),
     createdAt: Number(r.created_at),
   };
 }
@@ -31,7 +34,7 @@ function rowToAccount(r: Row): Account {
 export async function readAccounts(): Promise<Account[]> {
   const db = await getDb();
   const rs = await db.execute(
-    "SELECT name, salt, hash, location, created_at FROM accounts ORDER BY created_at ASC"
+    "SELECT name, salt, hash, location, avatar, created_at FROM accounts ORDER BY created_at ASC"
   );
   return rs.rows.map(rowToAccount);
 }
@@ -41,17 +44,34 @@ function hashPassword(password: string, salt: string): string {
 }
 
 export function toPublic(a: Account): PublicAccount {
-  return { name: a.name, location: a.location, createdAt: a.createdAt };
+  return { name: a.name, location: a.location, avatar: a.avatar, createdAt: a.createdAt };
 }
 
 /** Case-insensitive lookup so "Mama" and "mama" are the same account. */
 export async function findAccount(name: string): Promise<Account | undefined> {
   const db = await getDb();
   const rs = await db.execute({
-    sql: "SELECT name, salt, hash, location, created_at FROM accounts WHERE name_lower = ?",
+    sql: "SELECT name, salt, hash, location, avatar, created_at FROM accounts WHERE name_lower = ?",
     args: [name.trim().toLowerCase()],
   });
   return rs.rows[0] ? rowToAccount(rs.rows[0]) : undefined;
+}
+
+/** Set (or clear) a member's profile photo. Returns the updated public account. */
+export async function setAvatar(
+  name: string,
+  avatar: string | null
+): Promise<{ ok: true; account: PublicAccount } | { ok: false; error: string }> {
+  const account = await findAccount(name);
+  if (!account) {
+    return { ok: false, error: "Account nicht gefunden" };
+  }
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE accounts SET avatar = ? WHERE name_lower = ?",
+    args: [avatar, name.trim().toLowerCase()],
+  });
+  return { ok: true, account: toPublic({ ...account, avatar: avatar ?? undefined }) };
 }
 
 export async function createAccount(

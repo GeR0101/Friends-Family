@@ -56,7 +56,11 @@ export default function AuthPage() {
       }
       localStorage.setItem(
         "ff_user",
-        JSON.stringify({ name: data.user.name, location: data.user.location })
+        JSON.stringify({
+          name: data.user.name,
+          location: data.user.location,
+          avatar: data.user.avatar,
+        })
       );
       router.push("/dashboard");
     } catch {

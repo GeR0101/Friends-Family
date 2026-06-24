@@ -46,6 +46,7 @@ async function ensureSchema(db: Client) {
       salt       TEXT NOT NULL,
       hash       TEXT NOT NULL,
       location   TEXT NOT NULL,
+      avatar     TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS messages (
@@ -67,6 +68,12 @@ async function ensureSchema(db: Client) {
       last_seen  INTEGER NOT NULL
     );
   `);
+
+  // Migrate older accounts tables that predate the avatar column.
+  const cols = await db.execute("PRAGMA table_info(accounts)");
+  if (!cols.rows.some((r) => String(r.name) === "avatar")) {
+    await db.execute("ALTER TABLE accounts ADD COLUMN avatar TEXT");
+  }
 }
 
 // ── One-time seeding from the old JSON files ─────────────────────────────────

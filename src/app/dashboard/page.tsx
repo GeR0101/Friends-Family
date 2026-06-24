@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { timeAtEpoch } from "../lib/timezone";
 import { type Location, normalizeStoredUser } from "../lib/cities";
@@ -9,12 +9,42 @@ import WorldMap, { type MapPerson } from "../lib/worldmap";
 interface User {
   name: string;
   location: Location;
+  avatar?: string;
 }
 
 interface Account {
   name: string;
   location: Location;
+  avatar?: string;
   online: boolean;
+}
+
+// Read an image file, crop to a centered square and downscale to 256px, then
+// return a compact JPEG data URL suitable for storing on the account.
+function fileToAvatarDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode failed"));
+      img.onload = () => {
+        const SIZE = 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("no canvas"));
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, SIZE, SIZE);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 interface Meeting {
@@ -62,6 +92,10 @@ export default function DashboardPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [, setNowTick] = useState(0);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const u = normalizeStoredUser(localStorage.getItem("ff_user"));
@@ -86,7 +120,11 @@ export default function DashboardPage() {
           fetch("/api/accounts").then((r) => r.json()),
         ]);
         setOnlineUsers(pres.users.filter((x: any) => x.online).map((x: any) => x.name));
-        setAccounts(accs.users || []);
+        const list: Account[] = accs.users || [];
+        setAccounts(list);
+        // Keep my own avatar in sync if it was changed elsewhere.
+        const me = list.find((a) => a.name.toLowerCase() === u.name.toLowerCase());
+        if (me) setUser((prev) => (prev && prev.avatar !== me.avatar ? { ...prev, avatar: me.avatar } : prev));
       } catch {}
     }, 3000);
 
@@ -115,6 +153,35 @@ export default function DashboardPage() {
     const id = setInterval(() => setNowTick((t) => t + 1), 30000);
     return () => clearInterval(id);
   }, []);
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    setAvatarMenuOpen(false);
+    if (!file || !user) return;
+    setUploadingAvatar(true);
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file);
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: user.name, avatar: dataUrl }),
+      });
+      if (!res.ok) throw new Error("upload failed");
+      // Reflect immediately + persist for next load.
+      setUser((prev) => (prev ? { ...prev, avatar: dataUrl } : prev));
+      const stored = normalizeStoredUser(localStorage.getItem("ff_user"));
+      if (stored) {
+        localStorage.setItem(
+          "ff_user",
+          JSON.stringify({ name: stored.name, location: stored.location, avatar: dataUrl })
+        );
+      }
+    } catch {
+      // Silent: keep the old avatar on failure.
+    }
+    setUploadingAvatar(false);
+  };
 
   const handleLogout = () => {
     if (user) {
@@ -158,14 +225,117 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-violet-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg shadow-violet-200">
-              <span className="text-white font-bold text-xl">
-                {user.name.charAt(0).toUpperCase()}
-              </span>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAvatarMenuOpen((o) => !o)}
+                className="group relative w-14 h-14 rounded-full overflow-hidden shadow-lg shadow-violet-200 ring-2 ring-white focus:outline-none focus:ring-violet-300"
+                aria-label="Profilfoto ändern"
+              >
+                {user.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="flex w-full h-full items-center justify-center bg-gradient-to-br from-violet-400 to-purple-500 text-white font-bold text-xl">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/35 transition-colors">
+                  {uploadingAvatar ? (
+                    <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg
+                      className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.8}
+                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+
+              {avatarMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setAvatarMenuOpen(false)} />
+                  <div className="absolute left-0 top-16 z-20 w-48 rounded-2xl border border-gray-100 bg-white py-1.5 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-violet-50"
+                    >
+                      <svg className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Foto aufnehmen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => uploadInputRef.current?.click()}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-violet-50"
+                    >
+                      <svg className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Foto hochladen
+                    </button>
+                    {user.avatar && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setAvatarMenuOpen(false);
+                          await fetch("/api/profile", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ name: user.name, avatar: null }),
+                          });
+                          setUser((prev) => (prev ? { ...prev, avatar: undefined } : prev));
+                          const stored = normalizeStoredUser(localStorage.getItem("ff_user"));
+                          if (stored)
+                            localStorage.setItem(
+                              "ff_user",
+                              JSON.stringify({ name: stored.name, location: stored.location })
+                            );
+                        }}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-rose-500 hover:bg-rose-50"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Foto entfernen
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={handleAvatarFile}
+              />
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarFile}
+              />
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
-                Hallo, {user.name}! <span className="inline-block">👋</span>
+                Hallo, {user.name}!
               </h1>
               <p className="text-base text-gray-400">
                 Schön, dass du da bist.
