@@ -30,32 +30,162 @@ const SECURITY_QUESTIONS = [
 ];
 const CUSTOM_Q = "__custom__";
 
-// Read an image file, crop to a centered square and downscale to 256px, then
-// return a compact JPEG data URL suitable for storing on the account.
-function fileToAvatarDataUrl(file: File): Promise<string> {
+// Read a file to a data URL (the raw image to feed the cropper).
+function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("read failed"));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("decode failed"));
-      img.onload = () => {
-        const SIZE = 256;
-        const canvas = document.createElement("canvas");
-        canvas.width = SIZE;
-        canvas.height = SIZE;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("no canvas"));
-        const side = Math.min(img.width, img.height);
-        const sx = (img.width - side) / 2;
-        const sy = (img.height - side) / 2;
-        ctx.drawImage(img, sx, sy, side, side, 0, 0, SIZE, SIZE);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
-      };
-      img.src = reader.result as string;
-    };
+    reader.onload = () => resolve(reader.result as string);
     reader.readAsDataURL(file);
   });
+}
+
+// Interactive avatar cropper: drag to move, slider to zoom, circular preview.
+// Exports the framed area as a 256px square JPEG (shown round via object-cover).
+function AvatarCropper({
+  src,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  src: string;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (dataUrl: string) => void;
+}) {
+  const VIEW = 280;
+  const OUT = 256;
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  const [minScale, setMinScale] = useState(1);
+  const [scale, setScale] = useState(1);
+  const [off, setOff] = useState({ x: 0, y: 0 });
+  const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  const clamp = (o: { x: number; y: number }, s: number, n: { w: number; h: number }) => {
+    const dw = n.w * s;
+    const dh = n.h * s;
+    return {
+      x: Math.min(0, Math.max(VIEW - dw, o.x)),
+      y: Math.min(0, Math.max(VIEW - dh, o.y)),
+    };
+  };
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const ms = Math.max(VIEW / img.width, VIEW / img.height);
+      imgRef.current = img;
+      setNat({ w: img.width, h: img.height });
+      setMinScale(ms);
+      setScale(ms);
+      setOff({ x: (VIEW - img.width * ms) / 2, y: (VIEW - img.height * ms) / 2 });
+    };
+    img.src = src;
+  }, [src]);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    drag.current = { x: e.clientX, y: e.clientY, ox: off.x, oy: off.y };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!drag.current || !nat) return;
+    const nx = drag.current.ox + (e.clientX - drag.current.x);
+    const ny = drag.current.oy + (e.clientY - drag.current.y);
+    setOff(clamp({ x: nx, y: ny }, scale, nat));
+  };
+  const onPointerUp = () => {
+    drag.current = null;
+  };
+
+  const changeScale = (s: number) => {
+    if (!nat) return;
+    const c = VIEW / 2;
+    setOff((prev) => clamp({ x: c - (c - prev.x) * (s / scale), y: c - (c - prev.y) * (s / scale) }, s, nat));
+    setScale(s);
+  };
+
+  const save = () => {
+    if (!nat || !imgRef.current) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = OUT;
+    canvas.height = OUT;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const sSize = VIEW / scale;
+    ctx.drawImage(imgRef.current, -off.x / scale, -off.y / scale, sSize, sSize, 0, 0, OUT, OUT);
+    onSave(canvas.toDataURL("image/jpeg", 0.85));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl">
+        <h3 className="mb-1 text-center font-display text-lg font-semibold text-gray-800">
+          Foto anpassen
+        </h3>
+        <p className="mb-4 text-center text-xs text-gray-400">Ziehen zum Verschieben, Regler zum Zoomen</p>
+
+        <div
+          className="relative mx-auto touch-none select-none overflow-hidden rounded-2xl bg-gray-900"
+          style={{ width: VIEW, height: VIEW, maxWidth: "100%" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+        >
+          {nat && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={src}
+              alt=""
+              draggable={false}
+              style={{
+                position: "absolute",
+                left: off.x,
+                top: off.y,
+                width: nat.w * scale,
+                height: nat.h * scale,
+                maxWidth: "none",
+              }}
+            />
+          )}
+          {/* darken outside the circular safe area */}
+          <div
+            className="pointer-events-none absolute inset-0 rounded-full"
+            style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }}
+          />
+          <div className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-white/80" />
+        </div>
+
+        <input
+          type="range"
+          min={minScale}
+          max={minScale * 3}
+          step={0.001}
+          value={scale}
+          onChange={(e) => changeScale(parseFloat(e.target.value))}
+          className="mt-4 w-full accent-violet-500"
+        />
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={save}
+            disabled={saving || !nat}
+            className="flex-1 rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-2.5 font-semibold text-white shadow-sm transition-all hover:from-pink-600 hover:to-violet-600 disabled:opacity-50"
+          >
+            {saving ? "Speichern…" : "Speichern"}
+          </button>
+          <button
+            onClick={onCancel}
+            disabled={saving}
+            className="rounded-xl px-4 py-2.5 font-medium text-gray-500 hover:bg-gray-100"
+          >
+            Abbrechen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface Meeting {
@@ -105,6 +235,7 @@ export default function DashboardPage() {
   const [, setNowTick] = useState(0);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -183,10 +314,18 @@ export default function DashboardPage() {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-selecting the same file
     setAvatarMenuOpen(false);
-    if (!file || !user) return;
+    if (!file) return;
+    try {
+      setCropSrc(await fileToDataUrl(file)); // open the cropper
+    } catch {
+      /* ignore unreadable files */
+    }
+  };
+
+  const uploadAvatar = async (dataUrl: string) => {
+    if (!user) return;
     setUploadingAvatar(true);
     try {
-      const dataUrl = await fileToAvatarDataUrl(file);
       const res = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -199,9 +338,15 @@ export default function DashboardPage() {
       if (stored) {
         localStorage.setItem(
           "ff_user",
-          JSON.stringify({ name: stored.name, location: stored.location, avatar: dataUrl })
+          JSON.stringify({
+            name: stored.name,
+            location: stored.location,
+            avatar: dataUrl,
+            hasSecurityQuestion: stored.hasSecurityQuestion,
+          })
         );
       }
+      setCropSrc(null);
     } catch {
       // Silent: keep the old avatar on failure.
     }
@@ -281,6 +426,15 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-b from-orange-50/40 via-rose-50/30 to-violet-50/40">
+      {cropSrc && (
+        <AvatarCropper
+          src={cropSrc}
+          saving={uploadingAvatar}
+          onCancel={() => setCropSrc(null)}
+          onSave={uploadAvatar}
+        />
+      )}
+
       {/* Background decorations */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-0 w-64 h-64 bg-orange-100 rounded-full opacity-30 blur-3xl" />

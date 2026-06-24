@@ -52,14 +52,18 @@ function countdownLabel(ms: number): string {
 
 /* ───────────────────── single participant tile ───────────────────── */
 
+type TileVariant = "grid" | "spotlight" | "pip";
+
 function VideoTile({
   participant,
   isLocal,
-  count,
+  count = 1,
+  variant = "grid",
 }: {
   participant: DailyParticipant;
   isLocal: boolean;
-  count: number;
+  count?: number;
+  variant?: TileVariant;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -82,13 +86,23 @@ function VideoTile({
   }, [audioTrack, isLocal]);
 
   const name = participant.user_name || (isLocal ? "Du" : "Gast");
+  const isPip = variant === "pip";
+
+  const containerCls =
+    variant === "spotlight"
+      ? "relative h-full w-full overflow-hidden rounded-3xl bg-gradient-to-br from-gray-800 to-gray-900 ring-1 ring-white/10 shadow-lg"
+      : isPip
+      ? "relative h-36 w-24 sm:h-48 sm:w-32 overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 ring-2 ring-white/80 shadow-2xl"
+      : "relative aspect-video w-full overflow-hidden rounded-3xl bg-gradient-to-br from-gray-800 to-gray-900 ring-1 ring-white/10 shadow-lg";
+
+  const avatarCls = isPip
+    ? "h-12 w-12 text-base"
+    : variant === "spotlight" || count <= 2
+    ? "h-24 w-24 text-3xl"
+    : "h-16 w-16 text-xl";
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-800 to-gray-900 ring-1 ring-white/10 shadow-lg ${
-        count === 1 ? "aspect-video w-full" : "aspect-video"
-      }`}
-    >
+    <div className={containerCls}>
       {videoOn ? (
         <video
           ref={videoRef}
@@ -103,9 +117,7 @@ function VideoTile({
           <div
             className={`flex items-center justify-center rounded-full bg-gradient-to-br ${tileGradient(
               name
-            )} text-white font-bold shadow-lg ${
-              count <= 2 ? "h-24 w-24 text-3xl" : "h-16 w-16 text-xl"
-            }`}
+            )} text-white font-bold shadow-lg ${avatarCls}`}
           >
             {initials(name)}
           </div>
@@ -116,19 +128,30 @@ function VideoTile({
       {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
 
       {/* name + mic state */}
-      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur-sm">
-        {audioOff ? (
-          <svg className="h-3.5 w-3.5 text-rose-300" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M3.28 2.22a.75.75 0 00-1.06 1.06l18.5 18.5a.75.75 0 101.06-1.06l-3.6-3.6A7.46 7.46 0 0019.5 12a.75.75 0 00-1.5 0c0 .98-.25 1.9-.69 2.7l-1.06-1.06c.16-.51.25-1.06.25-1.64V6a3.75 3.75 0 00-7.31-1.18l5.06 5.06V6a2.25 2.25 0 00-4.5 0v.31L3.28 2.22zM6 10.5a.75.75 0 00-1.5 0V12a7.5 7.5 0 006.75 7.46V22.5a.75.75 0 001.5 0v-3.04a7.43 7.43 0 002.62-.77l-1.13-1.13c-.7.3-1.48.46-2.26.46A6 6 0 016 12v-1.5z" />
-          </svg>
-        ) : (
-          <span className="h-2 w-2 rounded-full bg-green-400" />
-        )}
-        <span className="text-xs font-medium text-white">
-          {name}
-          {isLocal && " (Du)"}
-        </span>
-      </div>
+      {isPip ? (
+        <div className="absolute bottom-1.5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 backdrop-blur-sm">
+          {audioOff && (
+            <svg className="h-3 w-3 text-rose-300" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3.28 2.22a.75.75 0 00-1.06 1.06l18.5 18.5a.75.75 0 101.06-1.06l-3.6-3.6A7.46 7.46 0 0019.5 12a.75.75 0 00-1.5 0c0 .98-.25 1.9-.69 2.7l-1.06-1.06c.16-.51.25-1.06.25-1.64V6a3.75 3.75 0 00-7.31-1.18l5.06 5.06V6a2.25 2.25 0 00-4.5 0v.31L3.28 2.22zM6 10.5a.75.75 0 00-1.5 0V12a7.5 7.5 0 006.75 7.46V22.5a.75.75 0 001.5 0v-3.04a7.43 7.43 0 002.62-.77l-1.13-1.13c-.7.3-1.48.46-2.26.46A6 6 0 016 12v-1.5z" />
+            </svg>
+          )}
+          <span className="text-[10px] font-medium text-white">{isLocal ? "Du" : name}</span>
+        </div>
+      ) : (
+        <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur-sm">
+          {audioOff ? (
+            <svg className="h-3.5 w-3.5 text-rose-300" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3.28 2.22a.75.75 0 00-1.06 1.06l18.5 18.5a.75.75 0 101.06-1.06l-3.6-3.6A7.46 7.46 0 0019.5 12a.75.75 0 00-1.5 0c0 .98-.25 1.9-.69 2.7l-1.06-1.06c.16-.51.25-1.06.25-1.64V6a3.75 3.75 0 00-7.31-1.18l5.06 5.06V6a2.25 2.25 0 00-4.5 0v.31L3.28 2.22zM6 10.5a.75.75 0 00-1.5 0V12a7.5 7.5 0 006.75 7.46V22.5a.75.75 0 001.5 0v-3.04a7.43 7.43 0 002.62-.77l-1.13-1.13c-.7.3-1.48.46-2.26.46A6 6 0 016 12v-1.5z" />
+            </svg>
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-green-400" />
+          )}
+          <span className="text-xs font-medium text-white">
+            {name}
+            {isLocal && " (Du)"}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -147,6 +170,7 @@ function RoomContent({ name }: { name: string }) {
   const [copied, setCopied] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+  const [spotlightSwapped, setSpotlightSwapped] = useState(false);
   const [meetingStart, setMeetingStart] = useState<number | null>(null);
   const [, setNowTick] = useState(0);
 
@@ -377,6 +401,32 @@ function RoomContent({ name }: { name: string }) {
               Bitte Kamera &amp; Mikrofon erlauben
             </p>
           </div>
+        ) : participants.length === 2 ? (
+          (() => {
+            // 1:1 call → the other person fills the stage, you sit in a small
+            // picture-in-picture you can tap to swap.
+            const localP = participants.find((p) => p.local) ?? participants[0];
+            const remoteP = participants.find((p) => !p.local) ?? participants[1];
+            const big = spotlightSwapped ? localP : remoteP;
+            const small = spotlightSwapped ? remoteP : localP;
+            return (
+              <div className="relative mx-auto h-[72vh] w-full max-w-5xl">
+                <VideoTile
+                  participant={big}
+                  isLocal={!!big.local}
+                  variant="spotlight"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSpotlightSwapped((s) => !s)}
+                  aria-label="Ansicht tauschen"
+                  className="absolute bottom-3 right-3 z-10 transition-transform active:scale-95 sm:bottom-4 sm:right-4"
+                >
+                  <VideoTile participant={small} isLocal={!!small.local} variant="pip" />
+                </button>
+              </div>
+            );
+          })()
         ) : (
           <div className={`grid w-full gap-4 ${gridCols}`}>
             {participants.map((p) => (
