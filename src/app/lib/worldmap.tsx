@@ -9,15 +9,12 @@ export interface MapPerson {
   lon: number;
   tz: string;
   flag?: string;
+  online?: boolean;
 }
 
-// On-brand marker palette; assigned deterministically per person.
-const MARKER_COLORS = ["#f59e0b", "#7c3aed", "#ec4899", "#0ea5e9", "#10b981", "#f43f5e"];
-function colorForName(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return MARKER_COLORS[h % MARKER_COLORS.length];
-}
+// Presence dot colors.
+const ONLINE_COLOR = "#22c55e"; // green-500
+const OFFLINE_COLOR = "#ef4444"; // red-500
 
 // Equirectangular grid resolution
 const GRID_COLS = 168;
@@ -107,7 +104,7 @@ export default function WorldMap({
   const [times, setTimes] = useState<Record<string, string>>({});
   const [personDay, setPersonDay] = useState<Record<string, boolean>>({});
 
-  const peopleKey = people.map((p) => `${p.name}@${p.tz}`).join("|");
+  const peopleKey = people.map((p) => `${p.name}@${p.tz}@${p.online ? 1 : 0}`).join("|");
 
   // Group people who sit on (essentially) the same spot into one cluster so
   // their markers and labels don't stack on top of each other.
@@ -249,31 +246,38 @@ export default function WorldMap({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // ── 5. Person markers (one per cluster, with a count badge) ──
+      // ── 5. Person markers — the dot itself shows presence (green/red) ──
       for (const c of clusters) {
-        const color = colorForName(c.members[0].name);
+        const single = c.members.length === 1;
+        // One person → green when online, red when offline. A group sharing a
+        // spot → neutral dot + count badge (per-person status lives in the label).
+        const mainColor = single
+          ? c.members[0].online
+            ? ONLINE_COLOR
+            : OFFLINE_COLOR
+          : "#94a3b8"; // slate-400
         const cx = lonToX(c.lon, W);
         const cy = latToY(c.lat, H);
 
         ctx.beginPath();
         ctx.arc(cx, cy, 13, 0, 2 * Math.PI);
-        ctx.fillStyle = color + "26";
+        ctx.fillStyle = mainColor + "26";
         ctx.fill();
 
         ctx.beginPath();
         ctx.arc(cx, cy, 5.5, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
+        ctx.fillStyle = mainColor;
         ctx.fill();
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        if (c.members.length > 1) {
+        if (!single) {
           const bx = cx + 9;
           const by = cy - 9;
           ctx.beginPath();
           ctx.arc(bx, by, 7.5, 0, 2 * Math.PI);
-          ctx.fillStyle = color;
+          ctx.fillStyle = "#7c3aed"; // violet count badge
           ctx.fill();
           ctx.strokeStyle = "#fff";
           ctx.lineWidth = 1.5;
@@ -342,8 +346,8 @@ export default function WorldMap({
                 {c.members.map((m) => (
                   <span key={m.name} className="flex items-center gap-1.5">
                     <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: colorForName(m.name) }}
+                      className="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-white"
+                      style={{ backgroundColor: m.online ? ONLINE_COLOR : OFFLINE_COLOR }}
                     />
                     <span className="text-xs font-medium text-gray-600">{m.name}</span>
                   </span>
@@ -353,8 +357,8 @@ export default function WorldMap({
               <>
                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-sm shadow-sm ring-1 ring-black/5">
                   <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: colorForName(c.members[0].name) }}
+                    className="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-white"
+                    style={{ backgroundColor: c.members[0].online ? ONLINE_COLOR : OFFLINE_COLOR }}
                   />
                   <span className="text-xs font-semibold text-gray-700">
                     {c.flag ? `${c.flag} ` : ""}
@@ -376,6 +380,20 @@ export default function WorldMap({
           </div>
         );
       })}
+
+      {/* Legend — green = online, red = offline */}
+      {!compact && (
+        <div className="absolute bottom-2 left-2 flex items-center gap-2.5 rounded-full bg-white/85 backdrop-blur-sm px-2.5 py-1 shadow-sm ring-1 ring-black/5">
+          <span className="flex items-center gap-1 text-[10px] font-medium text-gray-500">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ONLINE_COLOR }} />
+            online
+          </span>
+          <span className="flex items-center gap-1 text-[10px] font-medium text-gray-500">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: OFFLINE_COLOR }} />
+            offline
+          </span>
+        </div>
+      )}
     </div>
   );
 }

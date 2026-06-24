@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Row } from "@libsql/client";
 import { getDb } from "@/app/lib/db";
+import { sendPushToUser } from "@/app/lib/push";
 
 interface MeetingProposal {
   startsAt?: number; // absolute epoch (ms) — viewer renders in their own zone
@@ -186,6 +187,45 @@ export async function POST(req: NextRequest) {
         message.roomInvite ? JSON.stringify(message.roomInvite) : null,
       ],
     });
+
+    // Best-effort lock-screen notifications to the other people involved.
+    try {
+      const senderLower = message.user.toLowerCase();
+      const conv = message.conversationId!;
+      let recipients: string[];
+      if (conv.startsWith("dm:")) {
+        // "dm:a~b" → the participants, minus the sender.
+        recipients = conv
+          .slice(3)
+          .split("~")
+          .filter((n) => n && n !== senderLower);
+      } else if (conv.startsWith("grp:")) {
+        // "grp:a~b~c" → all group members, minus the sender.
+        recipients = conv
+          .slice(4)
+          .split("~")
+          .filter((n) => n && n !== senderLower);
+      } else {
+        // Group: everyone who has a subscription, except the sender.
+        const rs = await db.execute({
+          sql: "SELECT DISTINCT user_lower FROM push_subscriptions WHERE user_lower != ?",
+          args: [senderLower],
+        });
+        recipients = rs.rows.map((r) => String(r.user_lower));
+      }
+      const body = message.meetingProposal
+        ? "📅 schlägt ein Treffen vor"
+        : message.roomInvite
+        ? "📹 lädt dich in einen Video-Raum ein"
+        : message.text;
+      await Promise.all(
+        recipients.map((r) =>
+          sendPushToUser(r, { title: message.user, body, url: "/dashboard", tag: conv })
+        )
+      );
+    } catch {
+      // Notifications must never block sending a message.
+    }
 
     return NextResponse.json({ message });
   } catch (error) {

@@ -27,6 +27,7 @@ export function getDb(): Promise<Client> {
     initPromise = (async () => {
       await ensureSchema(db);
       if (isLocalFile) await seedLegacy(db);
+      await seedContacts(db);
       return db;
     })().catch((err) => {
       // Reset so a transient failure (e.g. cold Turso) can retry on next call.
@@ -69,6 +70,22 @@ async function ensureSchema(db: Client) {
       online     INTEGER NOT NULL DEFAULT 0,
       last_seen  INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint     TEXT PRIMARY KEY,
+      user_lower   TEXT NOT NULL,
+      subscription TEXT NOT NULL,
+      created_at   INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions (user_lower);
+    CREATE TABLE IF NOT EXISTS contacts (
+      requester_lower TEXT NOT NULL,
+      addressee_lower TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'pending',
+      created_at      INTEGER NOT NULL,
+      PRIMARY KEY (requester_lower, addressee_lower)
+    );
+    CREATE INDEX IF NOT EXISTS idx_contacts_addr ON contacts (addressee_lower, status);
+    CREATE INDEX IF NOT EXISTS idx_contacts_req ON contacts (requester_lower, status);
   `);
 
   // Add columns introduced after the initial accounts schema.
@@ -79,6 +96,27 @@ async function ensureSchema(db: Client) {
     await db.execute("ALTER TABLE accounts ADD COLUMN security_question TEXT");
   if (!has("security_answer_hash"))
     await db.execute("ALTER TABLE accounts ADD COLUMN security_answer_hash TEXT");
+}
+
+// One-time: when the contacts feature is first introduced, connect everyone who
+// already had an account (they were a family using the open model). Runs once —
+// after that the table is non-empty and new sign-ups must add each other.
+async function seedContacts(db: Client) {
+  if (!(await isEmpty(db, "contacts"))) return;
+  const rs = await db.execute("SELECT name_lower FROM accounts");
+  const names = rs.rows.map((r) => String(r.name_lower));
+  if (names.length < 2) return;
+  const now = Date.now();
+  const stmts = [];
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      stmts.push({
+        sql: "INSERT OR IGNORE INTO contacts (requester_lower, addressee_lower, status, created_at) VALUES (?, ?, 'accepted', ?)",
+        args: [names[i], names[j], now],
+      });
+    }
+  }
+  if (stmts.length) await db.batch(stmts, "write");
 }
 
 // ── One-time seeding from the old JSON files ─────────────────────────────────

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { timeAtEpoch } from "../lib/timezone";
 import { type Location, normalizeStoredUser } from "../lib/cities";
 import WorldMap, { type MapPerson } from "../lib/worldmap";
+import NotificationButton from "../components/NotificationButton";
+import ChatPanel from "../components/ChatPanel";
 
 interface User {
   name: string;
@@ -382,12 +384,13 @@ export default function DashboardPage() {
       try {
         // Keep our own presence fresh on every tick so we don't flicker out.
         beat(true);
-        const [pres, accs] = await Promise.all([
+        const [pres, cres] = await Promise.all([
           fetch("/api/chat/users").then((r) => r.json()),
-          fetch("/api/accounts").then((r) => r.json()),
+          fetch(`/api/contacts?user=${encodeURIComponent(u.name)}`).then((r) => r.json()),
         ]);
         setOnlineUsers(pres.users.filter((x: any) => x.online).map((x: any) => x.name));
-        const list: Account[] = accs.users || [];
+        // Only the user's own contacts populate the map (not every account).
+        const list: Account[] = cres.contacts || [];
         setAccounts(list);
         // Keep my own avatar in sync if it was changed elsewhere.
         const me = list.find((a) => a.name.toLowerCase() === u.name.toLowerCase());
@@ -536,19 +539,23 @@ export default function DashboardPage() {
 
   // Everyone (incl. me) shown on the map at their real location.
   const mapPeople: MapPerson[] = useMemo(() => {
-    const src = accounts.length
-      ? accounts
-      : user
-      ? [{ name: user.name, location: user.location, online: true }]
-      : [];
+    if (!user) return [];
+    const onlineSet = new Set(onlineUsers.map((n) => n.toLowerCase()));
+    // Me first, then my contacts (deduped) — never every account.
+    const others = accounts.filter((a) => a.name.toLowerCase() !== user.name.toLowerCase());
+    const src = [{ name: user.name, location: user.location }, ...others];
     return src.map((a) => ({
       name: a.name,
       lat: a.location.lat,
       lon: a.location.lon,
       tz: a.location.tz,
       flag: a.location.flag,
+      // I'm always "here"; contacts come from presence.
+      online:
+        a.name.toLowerCase() === user.name.toLowerCase() ||
+        onlineSet.has(a.name.toLowerCase()),
     }));
-  }, [accounts, user]);
+  }, [accounts, user, onlineUsers]);
 
   if (!user) return null;
 
@@ -802,43 +809,11 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Lock-screen notifications opt-in */}
+        <NotificationButton />
+
         {/* World map with day/night */}
         <WorldMap people={mapPeople} />
-
-        {/* Online users */}
-        <div className="bg-white rounded-3xl p-5 mb-5 shadow-sm ring-1 ring-black/5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-              <h2 className="text-lg font-bold text-gray-800">Online</h2>
-            </div>
-            <div className="w-10 h-10 flex items-center justify-center rounded-full ring-1 ring-black/5 text-gray-400">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.8}
-                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-1.5-5.6"
-                />
-              </svg>
-            </div>
-          </div>
-          {onlineUsers.length === 0 ? (
-            <p className="text-gray-400">Niemand ist online...</p>
-          ) : (
-            <div className="flex flex-wrap gap-2 mt-1">
-              {onlineUsers.map((name) => (
-                <div
-                  key={name}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full text-sm text-green-700"
-                >
-                  <div className="w-2 h-2 bg-green-400 rounded-full" />
-                  {name}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Upcoming meetings */}
         {meetings.length > 0 && (
@@ -917,50 +892,8 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Main action cards */}
-        <div className="grid gap-5 mb-5">
-          {/* Chat Card */}
-          <button
-            onClick={() => router.push("/chat")}
-            className="bg-white rounded-3xl p-6 text-left shadow-sm ring-1 ring-black/5 hover:shadow-md hover:ring-violet-200 transition-all group"
-          >
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 bg-gradient-to-br from-violet-100 to-purple-100 rounded-2xl flex items-center justify-center transition-all">
-                <svg
-                  className="w-8 h-8 text-violet-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.8}
-                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-800">
-                  Chat & Zeiten planen
-                </h2>
-              </div>
-              <svg
-                className="w-6 h-6 text-gray-300 group-hover:text-violet-400 group-hover:translate-x-1 transition-all"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </div>
-          </button>
-        </div>
+        {/* Chat lives right here on the home page */}
+        <ChatPanel />
 
       </div>
     </div>
