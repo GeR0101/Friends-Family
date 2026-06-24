@@ -6,8 +6,9 @@ interface MeetingProposal {
   startsAt?: number; // absolute epoch (ms) — viewer renders in their own zone
   proposedByTz?: string; // IANA of the proposer, for reference
   invitees?: string[];
-  status?: "pending" | "accepted";
+  status?: "pending" | "accepted" | "declined";
   acceptedBy?: string;
+  declinedBy?: string;
   roomName?: string;
   // Legacy fields (pre-absolute-time model) kept for old records.
   time?: string;
@@ -86,9 +87,9 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, action, by } = body;
 
-    if (!id || action !== "accept") {
+    if (!id || (action !== "accept" && action !== "decline")) {
       return NextResponse.json(
-        { error: "id and action='accept' are required" },
+        { error: "id and action='accept'|'decline' are required" },
         { status: 400 }
       );
     }
@@ -101,11 +102,19 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Meeting proposal not found" }, { status: 404 });
     }
 
-    // Already accepted → return as-is (idempotent, both parties can hit this).
-    if (msg.meetingProposal.status !== "accepted") {
+    if (action === "accept" && msg.meetingProposal.status !== "accepted") {
+      // Accepting (re-)opens the room, even if it was previously declined.
       msg.meetingProposal.status = "accepted";
       msg.meetingProposal.acceptedBy = by || "jemand";
+      msg.meetingProposal.declinedBy = undefined;
       msg.meetingProposal.roomName = `treffen-${msg.id}`;
+      await db.execute({
+        sql: "UPDATE messages SET meeting_proposal = ? WHERE id = ?",
+        args: [JSON.stringify(msg.meetingProposal), msg.id],
+      });
+    } else if (action === "decline" && msg.meetingProposal.status !== "declined") {
+      msg.meetingProposal.status = "declined";
+      msg.meetingProposal.declinedBy = by || "jemand";
       await db.execute({
         sql: "UPDATE messages SET meeting_proposal = ? WHERE id = ?",
         args: [JSON.stringify(msg.meetingProposal), msg.id],

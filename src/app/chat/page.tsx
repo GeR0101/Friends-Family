@@ -42,8 +42,9 @@ interface MeetingProposal {
   startsAt?: number; // absolute epoch (ms) — missing on legacy proposals
   proposedByTz?: string;
   invitees?: string[];
-  status?: "pending" | "accepted";
+  status?: "pending" | "accepted" | "declined";
   acceptedBy?: string;
+  declinedBy?: string;
   roomName?: string;
   // Legacy fields (pre-absolute-time model) used as a fallback.
   time?: string;
@@ -321,6 +322,42 @@ export default function ChatPage() {
     setAccepting(null);
   };
 
+  // Decline a proposal → marks it as "abgesagt" for everyone.
+  const declineProposal = async (msg: Message) => {
+    if (!user) return;
+    setAccepting(msg.id);
+    try {
+      await fetch("/api/chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: msg.id, action: "decline", by: user.name }),
+      });
+      await loadMessages();
+    } catch {}
+    setAccepting(null);
+  };
+
+  // "Andere Zeit" → open the planner prefilled with the same people.
+  const proposeOtherTime = (msg: Message) => {
+    const invitees = msg.meetingProposal?.invitees;
+    setInviteSel(
+      invitees && invitees.length
+        ? invitees.filter((n) => n.toLowerCase() !== user!.name.toLowerCase())
+        : selected?.type === "dm"
+        ? [selected.name]
+        : []
+    );
+    setShowTimePicker(true);
+  };
+
+  // "Erinnern" → a gentle reminder posted into the conversation.
+  const remindProposal = (msg: Message) => {
+    const p = msg.meetingProposal;
+    if (!p) return;
+    const when = timeAtEpoch(proposalEpoch(p), user!.location.tz);
+    sendMessage(`⏰ Erinnerung an das Treffen um ${when} Uhr`);
+  };
+
   const formatMessageTime = (timestamp: number) =>
     new Date(timestamp).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 
@@ -571,6 +608,20 @@ export default function ChatPage() {
                                 <span className={`text-xs font-medium ${isOwn ? "text-white/80" : "text-gray-500"}`}>
                                   Treffenvorschlag
                                 </span>
+                                {(() => {
+                                  const st = msg.meetingProposal!.status;
+                                  const chip =
+                                    st === "accepted"
+                                      ? { t: "zugesagt", c: isOwn ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-700" }
+                                      : st === "declined"
+                                      ? { t: "abgesagt", c: isOwn ? "bg-white/25 text-white" : "bg-rose-100 text-rose-600" }
+                                      : { t: "offen", c: isOwn ? "bg-white/25 text-white" : "bg-amber-100 text-amber-700" };
+                                  return (
+                                    <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${chip.c}`}>
+                                      {chip.t}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <div className="space-y-1.5">
                                 {(() => {
@@ -614,64 +665,113 @@ export default function ChatPage() {
                                 })()}
                               </div>
 
-                              {/* Plan → accept → enter flow */}
-                              {msg.meetingProposal.status === "accepted" &&
-                              msg.meetingProposal.roomName ? (
-                                <div className="mt-3">
-                                  <p
-                                    className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${
-                                      isOwn ? "text-white/90" : "text-emerald-600"
-                                    }`}
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Zugesagt von {msg.meetingProposal.acceptedBy} – Raum ist offen!
-                                  </p>
+                              {/* Plan → accept/decline → enter flow */}
+                              {(() => {
+                                const p = msg.meetingProposal!;
+                                const mayRespond =
+                                  !isOwn &&
+                                  (!p.invitees ||
+                                    p.invitees.length === 0 ||
+                                    p.invitees.some((n) => n.toLowerCase() === user.name.toLowerCase()));
+                                const busy = accepting === msg.id;
+                                const otherTimeBtn = (
                                   <button
-                                    onClick={() => router.push(`/room/${msg.meetingProposal!.roomName}`)}
-                                    className={`w-full py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-1.5 ${
-                                      isOwn
-                                        ? "bg-white text-violet-600 hover:bg-white/90"
-                                        : "bg-gradient-to-r from-pink-500 to-violet-500 text-white hover:from-pink-600 hover:to-violet-600 shadow-sm"
+                                    onClick={() => proposeOtherTime(msg)}
+                                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                                      isOwn ? "bg-white/20 text-white hover:bg-white/30" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50"
                                     }`}
                                   >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                    </svg>
-                                    Jetzt eintreten
+                                    Andere Zeit
                                   </button>
-                                </div>
-                              ) : isOwn ? (
-                                <p className={`mt-3 text-xs ${isOwn ? "text-white/70" : "text-gray-400"}`}>
-                                  ⏳ Warte auf Zusage …
-                                </p>
-                              ) : !msg.meetingProposal.invitees ||
-                                msg.meetingProposal.invitees.length === 0 ||
-                                msg.meetingProposal.invitees.some(
-                                  (n) => n.toLowerCase() === user.name.toLowerCase()
-                                ) ? (
-                                <button
-                                  onClick={() => acceptProposal(msg)}
-                                  disabled={accepting === msg.id}
-                                  className="mt-3 w-full py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 shadow-sm disabled:opacity-60"
-                                >
-                                  {accepting === msg.id ? (
-                                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  ) : (
-                                    <>
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                      </svg>
-                                      Annehmen &amp; eintreten
-                                    </>
-                                  )}
-                                </button>
-                              ) : (
-                                <p className="mt-3 text-xs text-gray-400">
-                                  Nur Eingeladene können zusagen
-                                </p>
-                              )}
+                                );
+
+                                if (p.status === "accepted" && p.roomName) {
+                                  return (
+                                    <div className="mt-3">
+                                      <p className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${isOwn ? "text-white/90" : "text-emerald-600"}`}>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Zugesagt von {p.acceptedBy} – Raum ist offen!
+                                      </p>
+                                      <button
+                                        onClick={() => router.push(`/room/${p.roomName}`)}
+                                        className={`w-full py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-1.5 ${
+                                          isOwn ? "bg-white text-violet-600 hover:bg-white/90" : "bg-gradient-to-r from-pink-500 to-violet-500 text-white hover:from-pink-600 hover:to-violet-600 shadow-sm"
+                                        }`}
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        Jetzt eintreten
+                                      </button>
+                                      <button
+                                        onClick={() => remindProposal(msg)}
+                                        className={`mt-2 w-full py-1.5 rounded-lg text-xs font-medium ${isOwn ? "text-white/80 hover:bg-white/15" : "text-gray-500 hover:bg-gray-100"}`}
+                                      >
+                                        ⏰ Erinnern
+                                      </button>
+                                    </div>
+                                  );
+                                }
+
+                                if (p.status === "declined") {
+                                  return (
+                                    <div className="mt-3">
+                                      <p className={`text-xs mb-2 ${isOwn ? "text-white/80" : "text-rose-500"}`}>
+                                        Abgesagt von {p.declinedBy}
+                                      </p>
+                                      {otherTimeBtn}
+                                    </div>
+                                  );
+                                }
+
+                                // pending
+                                if (mayRespond) {
+                                  return (
+                                    <div className="mt-3 flex flex-col gap-2">
+                                      <button
+                                        onClick={() => acceptProposal(msg)}
+                                        disabled={busy}
+                                        className="w-full py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 shadow-sm disabled:opacity-60"
+                                      >
+                                        {busy ? (
+                                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                          <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Zusagen &amp; eintreten
+                                          </>
+                                        )}
+                                      </button>
+                                      <div className="flex gap-2">
+                                        {otherTimeBtn}
+                                        <button
+                                          onClick={() => declineProposal(msg)}
+                                          disabled={busy}
+                                          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60 ${
+                                            isOwn ? "bg-white/20 text-white hover:bg-white/30" : "bg-white text-rose-500 ring-1 ring-rose-200 hover:bg-rose-50"
+                                          }`}
+                                        >
+                                          Absagen
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                // own pending
+                                return (
+                                  <div className="mt-3">
+                                    <p className={`text-xs mb-2 ${isOwn ? "text-white/70" : "text-gray-400"}`}>
+                                      ⏳ Warte auf Zusage …
+                                    </p>
+                                    {otherTimeBtn}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
 
