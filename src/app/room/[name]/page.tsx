@@ -80,6 +80,12 @@ function VideoTile({
     // Re-trigger playback — needed when the camera is toggled back on or the
     // element remounts (mobile browsers don't always auto-resume).
     if (videoTrack) el.play().catch(() => {});
+    return () => {
+      try {
+        el.pause();
+        el.srcObject = null;
+      } catch {}
+    };
   }, [videoTrack]);
 
   useEffect(() => {
@@ -88,6 +94,13 @@ function VideoTile({
     el.srcObject = audioTrack ? new MediaStream([audioTrack]) : null;
     // Explicit play() so remote audio is heard on mobile (autoplay is flaky).
     if (audioTrack) el.play().catch(() => {});
+    // Stop playback on unmount/leave so no audio keeps ringing.
+    return () => {
+      try {
+        el.pause();
+        el.srcObject = null;
+      } catch {}
+    };
   }, [audioTrack, isLocal]);
 
   const name = participant.user_name || (isLocal ? "Du" : "Gast");
@@ -207,8 +220,16 @@ function RoomContent({ name }: { name: string }) {
   }, [name]);
 
   const leave = useCallback(async () => {
+    const co = callRef.current;
+    callRef.current = null;
     try {
-      await callRef.current?.leave();
+      co?.setLocalAudio(false);
+      co?.setLocalVideo(false);
+      await co?.leave();
+    } catch {}
+    // Fully tear down so the mic/camera are released and no audio keeps ringing.
+    try {
+      await co?.destroy();
     } catch {}
     router.push(isGuest ? "/danke" : "/dashboard");
   }, [router, isGuest]);
