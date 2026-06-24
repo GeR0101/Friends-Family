@@ -258,8 +258,34 @@ function RoomContent({ name }: { name: string }) {
         if (existing) await existing.destroy();
         if (cancelled) return;
 
-        const co = DailyIframe.createCallObject({ url: data.url });
+        const co = DailyIframe.createCallObject({
+          url: data.url,
+          // Ask the camera for 720p so we have a sharp layer to send.
+          dailyConfig: {
+            userMediaVideoConstraints: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30 },
+            },
+          },
+        });
         callRef.current = co;
+
+        // Higher quality for small calls: raise the top simulcast layer to
+        // full 720p ~1.5 Mbps and prefer the best layer on receive. Adaptive
+        // layers stay on, so weak networks still scale down gracefully.
+        const boostQuality = () => {
+          co.updateSendSettings({
+            video: {
+              encodings: {
+                low: { maxBitrate: 200000, scaleResolutionDownBy: 4, maxFramerate: 15 },
+                medium: { maxBitrate: 600000, scaleResolutionDownBy: 2 },
+                high: { maxBitrate: 1500000, scaleResolutionDownBy: 1, maxFramerate: 30 },
+              },
+            },
+          }).catch(() => {});
+          co.updateReceiveSettings({ "*": { video: { layer: 2 } } }).catch(() => {});
+        };
 
         const sync = () => {
           if (cancelled) return;
@@ -278,6 +304,7 @@ function RoomContent({ name }: { name: string }) {
         co.on("joined-meeting", () => {
           if (cancelled) return;
           setIsJoining(false);
+          boostQuality();
           sync();
         })
           .on("participant-joined", sync)
