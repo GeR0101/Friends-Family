@@ -4,7 +4,8 @@ import { findCity, cityToLocation, resolveLocation } from "@/app/lib/cities";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, password, cityId, timezone } = await req.json();
+    const { name, password, cityId, timezone, securityQuestion, securityAnswer } =
+      await req.json();
     if (!name || !password) {
       return NextResponse.json(
         { error: "Name und Passwort sind erforderlich" },
@@ -17,7 +18,13 @@ export async function POST(req: NextRequest) {
     if (!location) {
       return NextResponse.json({ error: "Bitte wähle deinen Ort aus" }, { status: 400 });
     }
-    const result = await createAccount(name, password, location);
+    const result = await createAccount(
+      name,
+      password,
+      location,
+      securityQuestion,
+      securityAnswer
+    );
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 409 });
     }

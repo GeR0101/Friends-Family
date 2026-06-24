@@ -47,6 +47,8 @@ async function ensureSchema(db: Client) {
       hash       TEXT NOT NULL,
       location   TEXT NOT NULL,
       avatar     TEXT,
+      security_question    TEXT,
+      security_answer_hash TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS messages (
@@ -69,11 +71,14 @@ async function ensureSchema(db: Client) {
     );
   `);
 
-  // Migrate older accounts tables that predate the avatar column.
+  // Add columns introduced after the initial accounts schema.
   const cols = await db.execute("PRAGMA table_info(accounts)");
-  if (!cols.rows.some((r) => String(r.name) === "avatar")) {
-    await db.execute("ALTER TABLE accounts ADD COLUMN avatar TEXT");
-  }
+  const has = (c: string) => cols.rows.some((r) => String(r.name) === c);
+  if (!has("avatar")) await db.execute("ALTER TABLE accounts ADD COLUMN avatar TEXT");
+  if (!has("security_question"))
+    await db.execute("ALTER TABLE accounts ADD COLUMN security_question TEXT");
+  if (!has("security_answer_hash"))
+    await db.execute("ALTER TABLE accounts ADD COLUMN security_answer_hash TEXT");
 }
 
 // ── One-time seeding from the old JSON files ─────────────────────────────────

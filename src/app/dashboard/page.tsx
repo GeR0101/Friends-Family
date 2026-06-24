@@ -10,14 +10,25 @@ interface User {
   name: string;
   location: Location;
   avatar?: string;
+  hasSecurityQuestion?: boolean;
 }
 
 interface Account {
   name: string;
   location: Location;
   avatar?: string;
+  hasSecurityQuestion?: boolean;
   online: boolean;
 }
+
+const SECURITY_QUESTIONS = [
+  "Wie hieß dein erstes Haustier?",
+  "In welcher Stadt bist du geboren?",
+  "Wie lautet der Mädchenname deiner Mutter?",
+  "Wie hieß deine erste Schule?",
+  "Dein Spitzname als Kind?",
+];
+const CUSTOM_Q = "__custom__";
 
 // Read an image file, crop to a centered square and downscale to 256px, then
 // return a compact JPEG data URL suitable for storing on the account.
@@ -97,6 +108,15 @@ export default function DashboardPage() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // "Set a security question" prompt (for accounts created before the feature)
+  const [secOpen, setSecOpen] = useState(false);
+  const [secChoice, setSecChoice] = useState(SECURITY_QUESTIONS[0]);
+  const [secCustom, setSecCustom] = useState("");
+  const [secAnswer, setSecAnswer] = useState("");
+  const [secPassword, setSecPassword] = useState("");
+  const [secSaving, setSecSaving] = useState(false);
+  const [secError, setSecError] = useState("");
+
   useEffect(() => {
     const u = normalizeStoredUser(localStorage.getItem("ff_user"));
     if (!u) {
@@ -124,7 +144,12 @@ export default function DashboardPage() {
         setAccounts(list);
         // Keep my own avatar in sync if it was changed elsewhere.
         const me = list.find((a) => a.name.toLowerCase() === u.name.toLowerCase());
-        if (me) setUser((prev) => (prev && prev.avatar !== me.avatar ? { ...prev, avatar: me.avatar } : prev));
+        if (me)
+          setUser((prev) =>
+            prev && (prev.avatar !== me.avatar || prev.hasSecurityQuestion !== me.hasSecurityQuestion)
+              ? { ...prev, avatar: me.avatar, hasSecurityQuestion: me.hasSecurityQuestion }
+              : prev
+          );
       } catch {}
     }, 3000);
 
@@ -181,6 +206,47 @@ export default function DashboardPage() {
       // Silent: keep the old avatar on failure.
     }
     setUploadingAvatar(false);
+  };
+
+  const saveSecurityQuestion = async () => {
+    if (!user) return;
+    setSecError("");
+    const question = secChoice === CUSTOM_Q ? secCustom.trim() : secChoice;
+    if (!question) return setSecError("Bitte eine Frage angeben");
+    if (secAnswer.trim().length < 2) return setSecError("Bitte eine Antwort angeben");
+    if (secPassword.length < 4) return setSecError("Bitte dein aktuelles Passwort eingeben");
+    setSecSaving(true);
+    try {
+      const res = await fetch("/api/auth/security-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: user.name, password: secPassword, question, answer: secAnswer.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSecError(data.error || "Etwas ist schiefgelaufen");
+        setSecSaving(false);
+        return;
+      }
+      setUser((prev) => (prev ? { ...prev, hasSecurityQuestion: true } : prev));
+      const stored = normalizeStoredUser(localStorage.getItem("ff_user"));
+      if (stored)
+        localStorage.setItem(
+          "ff_user",
+          JSON.stringify({
+            name: stored.name,
+            location: stored.location,
+            avatar: stored.avatar,
+            hasSecurityQuestion: true,
+          })
+        );
+      setSecOpen(false);
+      setSecPassword("");
+      setSecAnswer("");
+    } catch {
+      setSecError("Verbindungsfehler – bitte nochmal versuchen");
+    }
+    setSecSaving(false);
   };
 
   const handleLogout = () => {
@@ -334,7 +400,7 @@ export default function DashboardPage() {
               />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-gray-800 tracking-tight">
                 Hallo, {user.name}!
               </h1>
               <p className="text-base text-gray-400">
@@ -362,6 +428,92 @@ export default function DashboardPage() {
             </svg>
           </button>
         </div>
+
+        {/* Prompt to add a security question (accounts created before the feature) */}
+        {user.hasSecurityQuestion === false && (
+          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 mb-5">
+            {!secOpen ? (
+              <div className="flex items-start gap-3">
+                <span className="text-xl leading-none">🔐</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-800">
+                    Sicherheitsfrage hinterlegen
+                  </p>
+                  <p className="text-xs text-amber-700/80 mt-0.5">
+                    Damit kannst du dein Passwort selbst zurücksetzen, falls du es mal vergisst.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSecOpen(true);
+                    setSecError("");
+                  }}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors"
+                >
+                  Einrichten
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                <p className="text-sm font-semibold text-amber-800">🔐 Sicherheitsfrage einrichten</p>
+                <select
+                  value={secChoice}
+                  onChange={(e) => setSecChoice(e.target.value)}
+                  className="w-full px-3 py-2 border border-amber-200 rounded-lg bg-white text-sm text-gray-800 appearance-none focus:ring-2 focus:ring-amber-300"
+                >
+                  {SECURITY_QUESTIONS.map((q) => (
+                    <option key={q} value={q}>
+                      {q}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_Q}>Eigene Frage…</option>
+                </select>
+                {secChoice === CUSTOM_Q && (
+                  <input
+                    type="text"
+                    value={secCustom}
+                    onChange={(e) => setSecCustom(e.target.value)}
+                    placeholder="Deine eigene Frage"
+                    className="w-full px-3 py-2 border border-amber-200 rounded-lg bg-white text-sm text-gray-800 focus:ring-2 focus:ring-amber-300"
+                  />
+                )}
+                <input
+                  type="text"
+                  value={secAnswer}
+                  onChange={(e) => setSecAnswer(e.target.value)}
+                  placeholder="Deine Antwort"
+                  className="w-full px-3 py-2 border border-amber-200 rounded-lg bg-white text-sm text-gray-800 focus:ring-2 focus:ring-amber-300"
+                />
+                <input
+                  type="password"
+                  value={secPassword}
+                  onChange={(e) => setSecPassword(e.target.value)}
+                  placeholder="Dein aktuelles Passwort (zur Bestätigung)"
+                  className="w-full px-3 py-2 border border-amber-200 rounded-lg bg-white text-sm text-gray-800 focus:ring-2 focus:ring-amber-300"
+                />
+                {secError && <p className="text-xs text-rose-500">{secError}</p>}
+                <div className="flex gap-2 pt-0.5">
+                  <button
+                    onClick={saveSecurityQuestion}
+                    disabled={secSaving}
+                    className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                  >
+                    {secSaving ? "Speichern…" : "Speichern"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSecOpen(false);
+                      setSecError("");
+                    }}
+                    className="px-4 py-2 rounded-lg text-amber-700 hover:bg-amber-100 text-sm font-medium"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* World map with day/night */}
         <WorldMap people={mapPeople} />

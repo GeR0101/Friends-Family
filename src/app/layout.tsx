@@ -1,11 +1,25 @@
 import type { Metadata } from "next";
+import { Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
 import VisualEditsMessenger from "../visual-edits/VisualEditsMessenger";
 import ErrorReporter from "@/components/ErrorReporter";
 import Script from "next/script";
 
+// Distinctive, friendly type: rounded display for the brand/headings,
+// warm humanist sans for body text.
+const fredoka = Fredoka({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
+});
+const nunito = Nunito({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-body",
+});
+
 export const metadata: Metadata = {
-  title: "Family & Friends - Video Treffen",
+  title: "Friends & Family - Video Treffen",
   description:
     "Der Treffpunkt für Familie und Freunde - Chatten, Videocalls machen und gemeinsame Zeiten finden",
   // Icons are picked up automatically from app/icon.svg and app/apple-icon.png.
@@ -18,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de">
-      <body className="antialiased">
+    <html lang="de" className={`${fredoka.variable} ${nunito.variable}`}>
+      <body className="antialiased font-body">
         <Script
           id="orchids-browser-logs"
           src="https://slelguoygbfzlpylpxfs.supabase.co/storage/v1/object/public/scripts/orchids-browser-logs.js"
