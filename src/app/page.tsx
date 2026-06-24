@@ -78,16 +78,12 @@ export default function AuthPage() {
         <div className="relative bg-white rounded-3xl shadow-lg shadow-violet-200/40 ring-1 ring-black/5 p-8">
           {/* Header */}
           <div className="text-center mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-pink-400 to-violet-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md shadow-violet-200">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"
-                />
-              </svg>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/bird.png"
+              alt="Family & Friends"
+              className="w-24 h-24 rounded-2xl object-cover mx-auto mb-4 shadow-md shadow-violet-200"
+            />
             <h1 className="text-2xl font-bold text-gray-800 mb-1">Family & Friends</h1>
             <p className="text-gray-500">
               {mode === "login" ? "Willkommen zurück! 👋" : "Erstelle deinen Account"}
