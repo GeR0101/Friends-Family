@@ -46,6 +46,7 @@ interface MeetingProposal {
   status?: "pending" | "accepted" | "declined";
   acceptedBy?: string;
   declinedBy?: string;
+  roomKey?: string;
   roomName?: string;
   // Legacy fields (pre-absolute-time model) used as a fallback.
   time?: string;
@@ -283,7 +284,9 @@ export default function ChatPage() {
     const startsAt =
       startsAtOverride ?? zonedToEpoch(`${selectedDate}T${selectedTime}`, user.location.tz);
     const invitees = inviteSel.filter((n) => n.toLowerCase() !== user.name.toLowerCase());
-    const proposal: MeetingProposal = { startsAt, proposedByTz: user.location.tz };
+    // Shared room key so every copy of this invite opens the SAME room.
+    const roomKey = `treffen-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const proposal: MeetingProposal = { startsAt, proposedByTz: user.location.tz, roomKey };
     // List everyone involved on the card (so all timezones show) when >1.
     if (invitees.length > 1) proposal.invitees = invitees;
 
@@ -292,7 +295,7 @@ export default function ChatPage() {
       sendMessage("", proposal, undefined, conversationId!);
       return;
     }
-    // Send the proposal into each invited person's direct chat.
+    // Send the proposal into each invited person's direct chat (same roomKey).
     invitees.forEach((inv) => sendMessage("", { ...proposal }, undefined, dmId(user.name, inv)));
     setSelected({ type: "dm", name: invitees[0] });
   };

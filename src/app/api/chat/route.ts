@@ -9,6 +9,7 @@ interface MeetingProposal {
   status?: "pending" | "accepted" | "declined";
   acceptedBy?: string;
   declinedBy?: string;
+  roomKey?: string; // shared room id so all copies of one invite join the same room
   roomName?: string;
   // Legacy fields (pre-absolute-time model) kept for old records.
   time?: string;
@@ -107,7 +108,9 @@ export async function PATCH(req: NextRequest) {
       msg.meetingProposal.status = "accepted";
       msg.meetingProposal.acceptedBy = by || "jemand";
       msg.meetingProposal.declinedBy = undefined;
-      msg.meetingProposal.roomName = `treffen-${msg.id}`;
+      // Use the shared room key so every invitee joins the SAME room.
+      msg.meetingProposal.roomName =
+        msg.meetingProposal.roomKey || `treffen-${msg.id}`;
       await db.execute({
         sql: "UPDATE messages SET meeting_proposal = ? WHERE id = ?",
         args: [JSON.stringify(msg.meetingProposal), msg.id],
