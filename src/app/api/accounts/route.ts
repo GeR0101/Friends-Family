@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { readAccounts, toPublic } from "@/lib/accounts";
 import { getDb } from "@/app/lib/db";
 
-const FIVE_MINUTES = 5 * 60 * 1000;
+const ONLINE_WINDOW_MS = 30 * 1000;
 
 export async function GET() {
   const accounts = await readAccounts();
 
   const db = await getDb();
-  const cutoff = Date.now() - FIVE_MINUTES;
+  const cutoff = Date.now() - ONLINE_WINDOW_MS;
   const rs = await db.execute({
     sql: "SELECT name_lower, last_seen FROM presence WHERE online = 1 AND last_seen >= ?",
     args: [cutoff],

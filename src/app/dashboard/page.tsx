@@ -372,27 +372,42 @@ export default function DashboardPage() {
     }
     setUser(u);
 
-    const beat = (online: boolean) =>
+    // Online = the app is open and in the foreground.
+    const beatOnline = () =>
       fetch("/api/chat/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: u.name, timezone: u.location.tz, online }),
+        body: JSON.stringify({ name: u.name, timezone: u.location.tz, online: true }),
       }).catch(() => {});
-    beat(true);
 
-    const interval = setInterval(async () => {
+    // Go offline reliably even while the page is closing/backgrounding —
+    // sendBeacon still goes through when a normal fetch would be cancelled.
+    const beatOffline = () => {
       try {
-        // Keep our own presence fresh on every tick so we don't flicker out.
-        beat(true);
+        const blob = new Blob([JSON.stringify({ name: u.name, online: false })], {
+          type: "application/json",
+        });
+        if (navigator.sendBeacon) navigator.sendBeacon("/api/chat/users", blob);
+        else
+          fetch("/api/chat/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: u.name, online: false }),
+            keepalive: true,
+          }).catch(() => {});
+      } catch {}
+    };
+
+    const poll = async () => {
+      try {
+        if (document.visibilityState === "visible") beatOnline();
         const [pres, cres] = await Promise.all([
           fetch("/api/chat/users").then((r) => r.json()),
           fetch(`/api/contacts?user=${encodeURIComponent(u.name)}`).then((r) => r.json()),
         ]);
         setOnlineUsers(pres.users.filter((x: any) => x.online).map((x: any) => x.name));
-        // Only the user's own contacts populate the map (not every account).
         const list: Account[] = cres.contacts || [];
         setAccounts(list);
-        // Keep my own avatar in sync if it was changed elsewhere.
         const me = list.find((a) => a.name.toLowerCase() === u.name.toLowerCase());
         if (me)
           setUser((prev) =>
@@ -401,11 +416,29 @@ export default function DashboardPage() {
               : prev
           );
       } catch {}
-    }, 3000);
+    };
+
+    if (document.visibilityState === "visible") beatOnline();
+    poll();
+    const interval = setInterval(poll, 3000);
+
+    // Flip online/offline the moment the app is hidden, backgrounded or closed.
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        beatOnline();
+        poll();
+      } else {
+        beatOffline();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", beatOffline);
 
     return () => {
       clearInterval(interval);
-      beat(false);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", beatOffline);
+      beatOffline();
     };
   }, [router]);
 

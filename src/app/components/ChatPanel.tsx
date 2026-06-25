@@ -273,22 +273,12 @@ export default function ChatPanel() {
     } catch {}
   }, [user]);
 
-  // Presence heartbeat + polling
+  // Poll contacts/requests. Presence (online/offline) is owned by the
+  // dashboard, which is always mounted around this panel.
   useEffect(() => {
     if (!user) return;
-    const beat = () => {
-      fetch("/api/chat/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: user.name, timezone: user.location.tz, online: true }),
-      }).catch(() => {});
-    };
-    beat();
     loadContacts();
-    const id = setInterval(() => {
-      beat();
-      loadContacts();
-    }, 4000);
+    const id = setInterval(loadContacts, 4000);
     return () => clearInterval(id);
   }, [user, loadContacts]);
 

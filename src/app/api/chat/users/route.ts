@@ -8,11 +8,11 @@ interface OnlineUser {
   lastSeen: number;
 }
 
-const FIVE_MINUTES = 5 * 60 * 1000;
+const ONLINE_WINDOW_MS = 30 * 1000;
 
 async function listOnline(): Promise<OnlineUser[]> {
   const db = await getDb();
-  const cutoff = Date.now() - FIVE_MINUTES;
+  const cutoff = Date.now() - ONLINE_WINDOW_MS;
   // Drop stale rows, then return who's currently online.
   await db.execute({ sql: "DELETE FROM presence WHERE last_seen < ?", args: [cutoff] });
   const rs = await db.execute({
