@@ -158,20 +158,14 @@ export default function NotificationButton() {
   }
 
   if (state === "granted") {
+    // Minimal once active — just a quiet confirmation line.
     return (
-      <div className="mb-5 flex items-center gap-3 rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
-        <span className="text-emerald-500">
-          <BellIcon />
-        </span>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-emerald-800">Benachrichtigungen sind an</p>
-          <p className="mt-0.5 text-xs text-emerald-700/80">
-            Du bekommst neue Nachrichten auch auf den Sperrbildschirm.
-          </p>
-        </div>
+      <div className="mb-4 flex items-center gap-1.5 px-1 text-xs text-gray-400">
+        <BellIcon className="w-3.5 h-3.5 text-emerald-500" />
+        <span>Benachrichtigungen an</span>
         <button
           onClick={disable}
-          className="flex-shrink-0 text-xs font-medium text-emerald-700/70 hover:text-emerald-800"
+          className="ml-2 underline-offset-2 hover:text-gray-600 hover:underline"
         >
           ausschalten
         </button>

@@ -248,6 +248,7 @@ export default function ChatPanel() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const prevConvRef = useRef<string | null>(null);
   const prevLastIdRef = useRef<string | null>(null);
+  const hadSelectionRef = useRef(false);
 
   // Load user
   useEffect(() => {
@@ -331,32 +332,37 @@ export default function ChatPanel() {
     return () => clearInterval(id);
   }, [conversationId, loadMessages]);
 
-  // Auto-scroll only when it helps: jump to the latest the first time a
-  // conversation's messages load, then follow new messages only if the user is
-  // already near the bottom. Otherwise leave the scroll alone so reading older
-  // messages isn't interrupted by the 2s polling.
+  const scrollToBottom = (smooth = false) => {
+    const el = listRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  };
+
+  // Scroll handling: jump straight to the newest message when a conversation
+  // opens, and again when I send one myself. Incoming messages never move the
+  // view — so reading older messages stays calm (no auto-scroll on polling).
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last) {
-      // Empty (e.g. right after switching) — wait for the real messages.
       prevLastIdRef.current = null;
       return;
     }
-    const el = listRef.current;
     const convChanged = prevConvRef.current !== conversationId;
     if (convChanged) {
       prevConvRef.current = conversationId;
       prevLastIdRef.current = last.id;
-      requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView());
+      // Run a couple of times so late-loading content (avatars, cards) doesn't
+      // leave us stranded mid-feed.
+      requestAnimationFrame(() => scrollToBottom());
+      setTimeout(() => scrollToBottom(), 120);
+      setTimeout(() => scrollToBottom(), 350);
       return;
     }
-    const isNewMessage = last.id !== prevLastIdRef.current;
-    const nearBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 140 : true;
-    if (isNewMessage && nearBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const isNew = last.id !== prevLastIdRef.current;
+    if (isNew && last.user === user?.name) {
+      scrollToBottom(true);
     }
     prevLastIdRef.current = last.id;
-  }, [messages, conversationId]);
+  }, [messages, conversationId, user]);
 
   // Grow the message box with its content (and shrink back after sending).
   useEffect(() => {
@@ -365,6 +371,25 @@ export default function ChatPanel() {
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`;
   }, [input]);
+
+  // Opening a conversation adds a history entry, so the browser back gesture
+  // (incl. the iOS swipe-from-left-edge) returns to the contact list instead of
+  // leaving the app. Switching between conversations doesn't stack entries.
+  useEffect(() => {
+    const has = !!selected;
+    if (has && !hadSelectionRef.current) {
+      window.history.pushState({ ffChat: true }, "");
+    }
+    hadSelectionRef.current = has;
+  }, [selected]);
+
+  useEffect(() => {
+    const onPop = () => {
+      if (hadSelectionRef.current) setSelected(null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const sendMessage = async (
     text: string,
@@ -632,7 +657,13 @@ export default function ChatPanel() {
     members.filter((m) => m.toLowerCase() !== user.name.toLowerCase()).map(displayName);
 
   return (
-    <div className="relative flex h-[78vh] max-h-[760px] bg-white/95 backdrop-blur-sm rounded-2xl shadow-sm ring-1 ring-black/5 overflow-hidden">
+    <div
+      className={`relative flex h-[78vh] max-h-[760px] rounded-2xl bg-white/95 backdrop-blur-sm shadow-sm ring-1 ring-black/5 overflow-hidden ${
+        selected
+          ? "max-md:fixed max-md:inset-0 max-md:z-50 max-md:h-[100dvh] max-md:max-h-none max-md:rounded-none"
+          : ""
+      }`}
+    >
         {/* ───── Sidebar: conversation list ───── */}
         <aside
           className={`${
@@ -832,9 +863,9 @@ export default function ChatPanel() {
           ) : (
             <>
               {/* Conversation header */}
-              <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100">
+              <div className="flex items-center gap-3 px-4 pb-3 pt-3 max-md:pt-[max(0.75rem,env(safe-area-inset-top))] bg-white border-b border-gray-100">
                 <button
-                  onClick={() => setSelected(null)}
+                  onClick={() => window.history.back()}
                   aria-label="Zurück"
                   className="md:hidden p-2 -ml-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl"
                 >
@@ -895,7 +926,8 @@ export default function ChatPanel() {
               </div>
 
               {/* Messages */}
-              <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4">
+                <div className="mx-auto max-w-lg space-y-3">
                 {messages.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-gray-400 text-sm">
@@ -1156,6 +1188,7 @@ export default function ChatPanel() {
                   );
                 })}
                 <div ref={messagesEndRef} />
+                </div>
               </div>
 
               {/* Time picker */}
@@ -1355,7 +1388,7 @@ export default function ChatPanel() {
               )}
 
               {/* Input bar */}
-              <div className="bg-white border-t border-gray-100 px-4 py-3">
+              <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 {detectedTime && convertedTime && otherLocation && (
                   <div className="mb-3">
                     <div className="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-2.5 shadow-sm">

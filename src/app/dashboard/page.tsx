@@ -586,7 +586,7 @@ export default function DashboardPage() {
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-violet-100 rounded-full opacity-30 blur-3xl" />
       </div>
 
-      <div className="relative max-w-5xl mx-auto">
+      <div className="relative max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -829,7 +829,7 @@ export default function DashboardPage() {
                   />
                 </svg>
               </div>
-              <h2 className="text-lg font-bold text-gray-800">Anstehende Treffen</h2>
+              <h2 className="text-lg font-bold text-gray-800">Geplante Treffen</h2>
             </div>
             <div className="space-y-2.5">
               {meetings.map((mt) => {
@@ -839,43 +839,31 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={mt.id}
-                    className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-r from-violet-50/70 to-pink-50/70 ring-1 ring-violet-100"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-2xl bg-gradient-to-r from-violet-50/70 to-pink-50/70 ring-1 ring-violet-100"
                   >
                     <div className="flex flex-col items-center justify-center w-16 flex-shrink-0 rounded-xl bg-white py-2 shadow-sm ring-1 ring-black/5">
                       <span className="text-lg font-bold leading-none text-gray-800">{myTime}</span>
                       <span className="mt-0.5 text-[10px] text-gray-400">{user.location.flag} Uhr</span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-gray-800">{dayLabel(mt.startsAt, user.location.tz)}</p>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                            live
-                              ? "bg-green-100 text-green-700"
-                              : soon
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-violet-100 text-violet-700"
-                          }`}
-                        >
-                          {countdownLabel(mt.startsAt)}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 truncate text-xs text-gray-400">
-                        mit {mt.invitees.length ? mt.invitees.join(", ") : "der ganzen Familie"}
+                      <p className="font-semibold text-gray-800">
+                        {dayLabel(mt.startsAt, user.location.tz)}
+                      </p>
+                      <p
+                        className={`mt-0.5 truncate text-xs font-medium ${
+                          live ? "text-green-600" : soon ? "text-amber-600" : "text-gray-400"
+                        }`}
+                      >
+                        {countdownLabel(mt.startsAt)}
+                        {mt.invitees.length > 0 ? ` · mit ${mt.invitees.join(", ")}` : ""}
                       </p>
                     </div>
-                    <button
-                      onClick={() => router.push(`/room/${mt.roomName}`)}
-                      className="flex-shrink-0 rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:from-pink-600 hover:to-violet-600"
-                    >
-                      {live ? "Beitreten" : "Eintreten"}
-                    </button>
                     <button
                       onClick={() => deleteMeeting(mt.id)}
                       disabled={deletingMeeting === mt.id}
                       aria-label="Treffen löschen"
                       title="Treffen löschen"
-                      className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
+                      className="order-2 flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
                     >
                       {deletingMeeting === mt.id ? (
                         <span className="w-4 h-4 border-2 border-rose-300 border-t-transparent rounded-full animate-spin" />
@@ -884,6 +872,12 @@ export default function DashboardPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-1 0v12a1 1 0 01-1 1H10a1 1 0 01-1-1V7h6z" />
                         </svg>
                       )}
+                    </button>
+                    <button
+                      onClick={() => router.push(`/room/${mt.roomName}`)}
+                      className="order-3 w-full sm:order-none sm:w-auto flex-shrink-0 rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:from-pink-600 hover:to-violet-600"
+                    >
+                      {live ? "Beitreten" : "Eintreten"}
                     </button>
                   </div>
                 );
