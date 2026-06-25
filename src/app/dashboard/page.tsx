@@ -586,7 +586,7 @@ export default function DashboardPage() {
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-violet-100 rounded-full opacity-30 blur-3xl" />
       </div>
 
-      <div className="relative max-w-2xl mx-auto">
+      <div className="relative max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">

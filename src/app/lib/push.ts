@@ -27,15 +27,16 @@ export interface PushPayload {
  * Send a notification to every device a user has registered. Dead subscriptions
  * (HTTP 404/410) are pruned. Best-effort: never throws to the caller.
  */
-export async function sendPushToUser(userLower: string, payload: PushPayload): Promise<void> {
-  if (!ensureConfigured()) return;
+export async function sendPushToUser(userLower: string, payload: PushPayload): Promise<number> {
+  if (!ensureConfigured()) return 0;
+  let sent = 0;
   try {
     const db = await getDb();
     const rs = await db.execute({
       sql: "SELECT endpoint, subscription FROM push_subscriptions WHERE user_lower = ?",
       args: [userLower],
     });
-    if (rs.rows.length === 0) return;
+    if (rs.rows.length === 0) return 0;
 
     const body = JSON.stringify(payload);
     await Promise.all(
@@ -44,6 +45,7 @@ export async function sendPushToUser(userLower: string, payload: PushPayload): P
         try {
           const sub = JSON.parse(String(row.subscription));
           await webpush.sendNotification(sub, body);
+          sent++;
         } catch (err: unknown) {
           const status = (err as { statusCode?: number })?.statusCode;
           if (status === 404 || status === 410) {
@@ -58,4 +60,5 @@ export async function sendPushToUser(userLower: string, payload: PushPayload): P
   } catch {
     // Notifications are non-critical — swallow any storage/transport errors.
   }
+  return sent;
 }

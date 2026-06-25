@@ -245,6 +245,7 @@ export default function ChatPanel() {
   const [, setTick] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const prevConvRef = useRef<string | null>(null);
   const prevLastIdRef = useRef<string | null>(null);
 
@@ -356,6 +357,14 @@ export default function ChatPanel() {
     }
     prevLastIdRef.current = last.id;
   }, [messages, conversationId]);
+
+  // Grow the message box with its content (and shrink back after sending).
+  useEffect(() => {
+    const ta = inputRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`;
+  }, [input]);
 
   const sendMessage = async (
     text: string,
@@ -1436,7 +1445,7 @@ export default function ChatPanel() {
                     </p>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
+                <div className="flex items-end gap-2">
                   <button
                     onClick={() => {
                       const opening = !showTimePicker;
@@ -1487,18 +1496,13 @@ export default function ChatPanel() {
                       />
                     </svg>
                   </button>
-                  <input
-                    type="text"
+                  <textarea
+                    ref={inputRef}
+                    rows={1}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={multiOpen ? "Nachricht an mehrere…" : "Schreib was…"}
-                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 bg-gray-50/60 text-gray-800 placeholder-gray-400 transition-all text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
+                    className="flex-1 min-w-0 resize-none max-h-32 px-4 py-2.5 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 bg-gray-50/60 text-gray-800 placeholder-gray-400 transition-all text-sm leading-snug"
                   />
                   <button
                     onClick={handleSend}
