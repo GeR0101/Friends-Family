@@ -31,6 +31,9 @@ interface Message {
   conversationId?: string;
   meetingProposal?: MeetingProposal;
   roomInvite?: RoomInvite;
+  // Everyone this message was sent to at once (sender + recipients). Lets a DM
+  // show "also sent to …" and offer reply-all, without a separate group thread.
+  broadcast?: string[];
 }
 
 function generateId(): string {
@@ -56,11 +59,12 @@ function rowToMessage(r: Row): Message {
     conversationId: r.conversation_id == null ? "group" : String(r.conversation_id),
     meetingProposal: parseJson<MeetingProposal>(r.meeting_proposal),
     roomInvite: parseJson<RoomInvite>(r.room_invite),
+    broadcast: parseJson<string[]>(r.broadcast),
   };
 }
 
 const SELECT =
-  "SELECT id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite FROM messages";
+  "SELECT id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast FROM messages";
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
@@ -151,7 +155,7 @@ export async function DELETE(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { user, text, timezone, meetingProposal, roomInvite, conversationId } = body;
+    const { user, text, timezone, meetingProposal, roomInvite, conversationId, broadcast } = body;
 
     if (!user || !text) {
       return NextResponse.json({ error: "user and text are required" }, { status: 400 });
@@ -172,10 +176,13 @@ export async function POST(req: NextRequest) {
     if (roomInvite && roomInvite.name) {
       message.roomInvite = { name: roomInvite.name, url: roomInvite.url };
     }
+    if (Array.isArray(broadcast) && broadcast.length > 1) {
+      message.broadcast = broadcast;
+    }
 
     const db = await getDb();
     await db.execute({
-      sql: "INSERT INTO messages (id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO messages (id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       args: [
         message.id,
         message.user,
@@ -185,6 +192,7 @@ export async function POST(req: NextRequest) {
         message.conversationId!,
         message.meetingProposal ? JSON.stringify(message.meetingProposal) : null,
         message.roomInvite ? JSON.stringify(message.roomInvite) : null,
+        message.broadcast ? JSON.stringify(message.broadcast) : null,
       ],
     });
 

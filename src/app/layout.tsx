@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
 import VisualEditsMessenger from "../visual-edits/VisualEditsMessenger";
@@ -24,6 +24,12 @@ export const metadata: Metadata = {
     "Der Treffpunkt für Familie und Freunde - Chatten, Videocalls machen und gemeinsame Zeiten finden",
   // Icons are picked up automatically from app/icon.svg and app/apple-icon.png.
   manifest: "/manifest.webmanifest",
+};
+
+// viewport-fit=cover is required so env(safe-area-inset-*) works in the
+// installed (standalone) app — otherwise the footer clings to the very bottom.
+export const viewport: Viewport = {
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

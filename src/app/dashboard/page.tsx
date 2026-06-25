@@ -560,7 +560,7 @@ export default function DashboardPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-b from-orange-50/40 via-rose-50/30 to-violet-50/40">
+    <div className="min-h-screen p-4 sm:p-6 pt-[max(1rem,env(safe-area-inset-top))] bg-gradient-to-b from-orange-50/40 via-rose-50/30 to-violet-50/40">
       {cameraOpen && (
         <CameraCapture
           onCancel={() => setCameraOpen(false)}

@@ -60,7 +60,8 @@ async function ensureSchema(db: Client) {
       timestamp       INTEGER NOT NULL,
       conversation_id TEXT NOT NULL DEFAULT 'group',
       meeting_proposal TEXT,
-      room_invite      TEXT
+      room_invite      TEXT,
+      broadcast        TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages (conversation_id, timestamp);
     CREATE TABLE IF NOT EXISTS presence (
@@ -96,6 +97,11 @@ async function ensureSchema(db: Client) {
     await db.execute("ALTER TABLE accounts ADD COLUMN security_question TEXT");
   if (!has("security_answer_hash"))
     await db.execute("ALTER TABLE accounts ADD COLUMN security_answer_hash TEXT");
+
+  // "broadcast" (a message sent to several people at once) added after launch.
+  const mcols = await db.execute("PRAGMA table_info(messages)");
+  if (!mcols.rows.some((r) => String(r.name) === "broadcast"))
+    await db.execute("ALTER TABLE messages ADD COLUMN broadcast TEXT");
 }
 
 // One-time: when the contacts feature is first introduced, connect everyone who

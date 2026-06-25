@@ -17,11 +17,7 @@ import {
   normalizeStoredUser,
   resolveLocation,
 } from "../lib/cities";
-import {
-  dmId,
-  grpId,
-  type Selection,
-} from "../lib/conversation";
+import { dmId, type Selection } from "../lib/conversation";
 
 interface User {
   name: string;
@@ -77,6 +73,7 @@ interface Message {
   timestamp: number;
   meetingProposal?: MeetingProposal;
   roomInvite?: RoomInvite;
+  broadcast?: string[];
 }
 
 // Deterministic on-brand avatar gradient per person name.
@@ -224,7 +221,6 @@ export default function ChatPanel() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [groups, setGroups] = useState<{ id: string; members: string[]; lastTs: number }[]>([]);
   const [incoming, setIncoming] = useState<{ name: string; location: Location; avatar?: string }[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
@@ -277,16 +273,6 @@ export default function ChatPanel() {
     } catch {}
   }, [user]);
 
-  // Load the group conversations the user is part of.
-  const loadGroups = useCallback(async () => {
-    if (!user) return;
-    try {
-      const res = await fetch(`/api/chat/conversations?user=${encodeURIComponent(user.name)}`);
-      const data = await res.json();
-      setGroups(data.groups || []);
-    } catch {}
-  }, [user]);
-
   // Presence heartbeat + polling
   useEffect(() => {
     if (!user) return;
@@ -299,14 +285,12 @@ export default function ChatPanel() {
     };
     beat();
     loadContacts();
-    loadGroups();
     const id = setInterval(() => {
       beat();
       loadContacts();
-      loadGroups();
     }, 4000);
     return () => clearInterval(id);
-  }, [user, loadContacts, loadGroups]);
+  }, [user, loadContacts]);
 
   const conversationId = user && selected
     ? selected.type === "group"
@@ -430,9 +414,9 @@ export default function ChatPanel() {
         : [...prev, name]
     );
 
-  // Start (or continue) a conversation with the selected people. One friend →
-  // a normal DM; two or more → a shared group thread where everyone can reply
-  // to everyone (reply-all), and the recipients see it as a group.
+  // Send the same message into each recipient's direct chat (no group thread).
+  // The full audience is tagged on every copy so each DM can show "auch an …"
+  // and offer reply-all.
   const sendToMultiple = async (text: string) => {
     if (!user) return;
     const targets = msgRecipients.filter((n) => n.toLowerCase() !== user.name.toLowerCase());
@@ -440,30 +424,47 @@ export default function ChatPanel() {
       sendMessage(text);
       return;
     }
-    const next: Selection =
-      targets.length === 1
-        ? { type: "dm", name: targets[0] }
-        : { type: "group", id: grpId([user.name, ...targets]), members: [user.name, ...targets] };
-    const conv = next.type === "group" ? next.id : dmId(user.name, next.name);
+    if (targets.length === 1) {
+      // Just a normal direct message.
+      await sendMessage(text, undefined, undefined, dmId(user.name, targets[0]));
+      setMultiOpen(false);
+      setMsgRecipients([]);
+      setSelected({ type: "dm", name: targets[0] });
+      return;
+    }
+    const audience = [user.name, ...targets];
     setSending(true);
     try {
-      await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: user.name,
-          text,
-          timezone: user.location.tz,
-          conversationId: conv,
-        }),
-      });
+      await Promise.all(
+        targets.map((n) =>
+          fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user: user.name,
+              text,
+              timezone: user.location.tz,
+              conversationId: dmId(user.name, n),
+              broadcast: audience,
+            }),
+          })
+        )
+      );
       setInput("");
       setMultiOpen(false);
       setMsgRecipients([]);
-      // Open the conversation we just wrote to.
-      setSelected(next);
+      setSelected({ type: "dm", name: targets[0] });
     } catch {}
     setSending(false);
+  };
+
+  // "Allen antworten" — reply to everyone a broadcast went to.
+  const replyAll = (audience: string[]) => {
+    if (!user) return;
+    setMsgRecipients(audience.filter((n) => n.toLowerCase() !== user.name.toLowerCase()));
+    setShowTimePicker(false);
+    setMultiOpen(true);
+    inputRef.current?.focus();
   };
 
   // Send a contact request by name (or auto-accept if they invited us first).
@@ -712,7 +713,7 @@ export default function ChatPanel() {
                     }
                   }}
                   placeholder="Name eingeben…"
-                  className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
+                  className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-base sm:text-sm text-gray-800 placeholder-gray-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
                 />
                 <button
                   onClick={sendContactRequest}
@@ -731,7 +732,7 @@ export default function ChatPanel() {
           )}
 
           <div className="flex-1 overflow-y-auto py-2">
-            {otherContacts.length === 0 && groups.length === 0 && incoming.length === 0 && (
+            {otherContacts.length === 0 && incoming.length === 0 && (
               <p className="px-4 py-3 text-sm text-gray-400">
                 Noch keine Freunde – tippe oben auf{" "}
                 <span className="font-semibold">Neuer Kontakt</span> und füge jemanden per Name hinzu.
@@ -772,42 +773,6 @@ export default function ChatPanel() {
                 <div className="mt-1 border-b border-gray-100" />
               </div>
             )}
-
-            {/* Group conversations */}
-            {groups.map((g) => {
-              const names = otherMembers(g.members);
-              const active = selected?.type === "group" && selected.id === g.id;
-              return (
-                <button
-                  key={g.id}
-                  onClick={() => setSelected({ type: "group", id: g.id, members: g.members })}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                    active ? "bg-violet-50" : "hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex flex-shrink-0 -space-x-3">
-                    {names.slice(0, 2).map((n) => (
-                      <Avatar
-                        key={n}
-                        name={n}
-                        avatar={avatarFor(n)}
-                        className="w-9 h-9 ring-2 ring-white"
-                        textClassName="text-xs"
-                      />
-                    ))}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-800 truncate">{names.join(", ")}</p>
-                    <p className="text-xs text-gray-400 truncate">
-                      Gruppe · {g.members.length} Personen
-                    </p>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-1.5-5.6" />
-                  </svg>
-                </button>
-              );
-            })}
 
             {otherContacts.map((c) => (
               <button
@@ -1179,6 +1144,41 @@ export default function ChatPanel() {
                         >
                           <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
 
+                          {msg.broadcast && msg.broadcast.length > 1 && (() => {
+                            const others = msg.broadcast.filter(
+                              (n) =>
+                                n.toLowerCase() !== msg.user.toLowerCase() &&
+                                n.toLowerCase() !== user.name.toLowerCase()
+                            );
+                            const label = isOwn
+                              ? `an ${msg.broadcast
+                                  .filter((n) => n.toLowerCase() !== user.name.toLowerCase())
+                                  .join(", ")}`
+                              : others.length
+                              ? `auch an ${others.join(", ")}`
+                              : null;
+                            return (
+                              <div
+                                className={`mt-1.5 flex items-center gap-1.5 text-[11px] ${
+                                  isOwn ? "text-white/70" : "text-gray-400"
+                                }`}
+                              >
+                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-1.5-5.6" />
+                                </svg>
+                                {label && <span className="truncate">{label}</span>}
+                                {!isOwn && (
+                                  <button
+                                    onClick={() => replyAll(msg.broadcast!)}
+                                    className="ml-auto flex-shrink-0 font-medium text-violet-500 underline-offset-2 hover:underline"
+                                  >
+                                    Allen antworten
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()}
+
                           <p className={`text-[10px] mt-1 ${isOwn ? "text-white/60" : "text-gray-400"}`}>
                             {formatMessageTime(msg.timestamp)}
                           </p>
@@ -1273,7 +1273,7 @@ export default function ChatPanel() {
                         <select
                           value={selectedDate}
                           onChange={(e) => setSelectedDate(e.target.value)}
-                          className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2 text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
+                          className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2 text-base sm:text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
                         >
                           {Array.from({ length: 7 }, (_, i) => {
                             const d = new Date();
@@ -1305,7 +1305,7 @@ export default function ChatPanel() {
                             onChange={(e) =>
                               setSelectedTime(`${e.target.value}:${selectedTime.split(":")[1]}`)
                             }
-                            className="rounded-xl border border-gray-200 bg-gray-50/60 px-2.5 py-2 text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
+                            className="rounded-xl border border-gray-200 bg-gray-50/60 px-2.5 py-2 text-base sm:text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
                           >
                             {Array.from({ length: 24 }, (_, h) => {
                               const hh = String(h).padStart(2, "0");
@@ -1322,7 +1322,7 @@ export default function ChatPanel() {
                             onChange={(e) =>
                               setSelectedTime(`${selectedTime.split(":")[0]}:${e.target.value}`)
                             }
-                            className="rounded-xl border border-gray-200 bg-gray-50/60 px-2.5 py-2 text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
+                            className="rounded-xl border border-gray-200 bg-gray-50/60 px-2.5 py-2 text-base sm:text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
                           >
                             {["00", "15", "30", "45"].map((mm) => (
                               <option key={mm} value={mm}>
@@ -1535,7 +1535,7 @@ export default function ChatPanel() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={multiOpen ? "Nachricht an mehrere…" : "Schreib was…"}
-                    className="flex-1 min-w-0 resize-none max-h-32 px-4 py-2.5 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 bg-gray-50/60 text-gray-800 placeholder-gray-400 transition-all text-sm leading-snug"
+                    className="flex-1 min-w-0 resize-none max-h-32 px-4 py-2.5 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 bg-gray-50/60 text-gray-800 placeholder-gray-400 transition-all text-base sm:text-sm leading-snug"
                   />
                   <button
                     onClick={handleSend}
