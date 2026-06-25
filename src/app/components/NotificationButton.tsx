@@ -38,6 +38,7 @@ function BellIcon({ className = "w-5 h-5" }: { className?: string }) {
 
 export default function NotificationButton() {
   const [state, setState] = useState<State>("loading");
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -72,7 +73,11 @@ export default function NotificationButton() {
   };
 
   const enable = async () => {
-    if (!PUBLIC_KEY) return;
+    setErr(null);
+    if (!PUBLIC_KEY) {
+      setErr("Benachrichtigungen sind serverseitig noch nicht eingerichtet (VAPID-Schlüssel fehlt).");
+      return;
+    }
     setState("working");
     try {
       const reg = await navigator.serviceWorker.register("/sw.js");
@@ -80,6 +85,7 @@ export default function NotificationButton() {
       const perm = await Notification.requestPermission();
       if (perm !== "granted") {
         setState(perm === "denied" ? "denied" : "default");
+        if (perm !== "denied") setErr("Du hast die Berechtigung nicht erteilt.");
         return;
       }
       const sub = await reg.pushManager.subscribe({
@@ -92,8 +98,9 @@ export default function NotificationButton() {
         body: JSON.stringify({ user: getName(), subscription: sub }),
       });
       setState("granted");
-    } catch {
+    } catch (e) {
       setState("default");
+      setErr("Hat nicht geklappt: " + (e instanceof Error ? e.message : "unbekannt"));
     }
   };
 
@@ -174,23 +181,26 @@ export default function NotificationButton() {
 
   // default / working
   return (
-    <button
-      onClick={enable}
-      disabled={state === "working"}
-      className="mb-5 flex w-full items-center gap-3 rounded-3xl border border-gray-100 bg-white p-4 text-left shadow-sm ring-1 ring-black/5 transition-all hover:bg-gray-50 disabled:opacity-60"
-    >
-      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-400 to-violet-500 text-white">
-        <BellIcon />
-      </span>
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-gray-800">Benachrichtigungen aktivieren</p>
-        <p className="mt-0.5 text-xs text-gray-400">
-          Neue Nachrichten direkt auf den Sperrbildschirm – wie bei WhatsApp.
-        </p>
-      </div>
-      {state === "working" && (
-        <span className="h-5 w-5 flex-shrink-0 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
-      )}
-    </button>
+    <div className="mb-5">
+      <button
+        onClick={enable}
+        disabled={state === "working"}
+        className="flex w-full items-center gap-3 rounded-3xl border border-gray-100 bg-white p-4 text-left shadow-sm ring-1 ring-black/5 transition-all hover:bg-gray-50 disabled:opacity-60"
+      >
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-400 to-violet-500 text-white">
+          <BellIcon />
+        </span>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-gray-800">Benachrichtigungen aktivieren</p>
+          <p className="mt-0.5 text-xs text-gray-400">
+            Neue Nachrichten direkt auf den Sperrbildschirm.
+          </p>
+        </div>
+        {state === "working" && (
+          <span className="h-5 w-5 flex-shrink-0 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
+        )}
+      </button>
+      {err && <p className="mt-1.5 px-1 text-xs text-rose-500">{err}</p>}
+    </div>
   );
 }

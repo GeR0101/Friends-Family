@@ -244,6 +244,9 @@ export default function ChatPanel() {
   const [sending, setSending] = useState(false);
   const [, setTick] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const prevConvRef = useRef<string | null>(null);
+  const prevLastIdRef = useRef<string | null>(null);
 
   // Load user
   useEffect(() => {
@@ -327,9 +330,32 @@ export default function ChatPanel() {
     return () => clearInterval(id);
   }, [conversationId, loadMessages]);
 
+  // Auto-scroll only when it helps: jump to the latest the first time a
+  // conversation's messages load, then follow new messages only if the user is
+  // already near the bottom. Otherwise leave the scroll alone so reading older
+  // messages isn't interrupted by the 2s polling.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const last = messages[messages.length - 1];
+    if (!last) {
+      // Empty (e.g. right after switching) — wait for the real messages.
+      prevLastIdRef.current = null;
+      return;
+    }
+    const el = listRef.current;
+    const convChanged = prevConvRef.current !== conversationId;
+    if (convChanged) {
+      prevConvRef.current = conversationId;
+      prevLastIdRef.current = last.id;
+      requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView());
+      return;
+    }
+    const isNewMessage = last.id !== prevLastIdRef.current;
+    const nearBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 140 : true;
+    if (isNewMessage && nearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevLastIdRef.current = last.id;
+  }, [messages, conversationId]);
 
   const sendMessage = async (
     text: string,
@@ -597,7 +623,7 @@ export default function ChatPanel() {
     members.filter((m) => m.toLowerCase() !== user.name.toLowerCase()).map(displayName);
 
   return (
-    <div className="relative flex h-[78vh] max-h-[760px] bg-white/95 backdrop-blur-sm rounded-3xl shadow-sm ring-1 ring-black/5 overflow-hidden">
+    <div className="relative flex h-[78vh] max-h-[760px] bg-white/95 backdrop-blur-sm rounded-2xl shadow-sm ring-1 ring-black/5 overflow-hidden">
         {/* ───── Sidebar: conversation list ───── */}
         <aside
           className={`${
@@ -860,7 +886,7 @@ export default function ChatPanel() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
                 {messages.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-gray-400 text-sm">
@@ -1320,7 +1346,7 @@ export default function ChatPanel() {
               )}
 
               {/* Input bar */}
-              <div className="bg-white border-t border-gray-100 px-3 py-3">
+              <div className="bg-white border-t border-gray-100 px-4 py-3">
                 {detectedTime && convertedTime && otherLocation && (
                   <div className="mb-3">
                     <div className="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-2.5 shadow-sm">
@@ -1465,11 +1491,7 @@ export default function ChatPanel() {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={
-                      multiOpen
-                        ? "Nachricht an mehrere…"
-                        : "Schreib was... (z.B. 15:00 für Umrechnung)"
-                    }
+                    placeholder={multiOpen ? "Nachricht an mehrere…" : "Schreib was…"}
                     className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 bg-gray-50/60 text-gray-800 placeholder-gray-400 transition-all text-sm"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
