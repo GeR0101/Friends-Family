@@ -3,6 +3,7 @@ import { Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
 import VisualEditsMessenger from "../visual-edits/VisualEditsMessenger";
 import ErrorReporter from "@/components/ErrorReporter";
+import ServiceWorkerRegistrar from "./components/ServiceWorkerRegistrar";
 import Script from "next/script";
 
 // Distinctive, friendly type: rounded display for the brand/headings,
@@ -47,6 +48,7 @@ export default function RootLayout({
           data-orchids-project-id="cd273982-090a-454f-8cb2-cf59dce52ea1"
         />
         <ErrorReporter />
+        <ServiceWorkerRegistrar />
         <Script
           src="https://slelguoygbfzlpylpxfs.supabase.co/storage/v1/object/public/scripts//route-messenger.js"
           strategy="afterInteractive"

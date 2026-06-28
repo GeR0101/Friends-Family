@@ -1,5 +1,15 @@
 // Service worker for Hello Tropics — lock-screen push notifications.
 
+// Activate immediately so the very first load is controlled — Chrome on Android
+// only treats the site as an installable PWA once a service worker with a fetch
+// handler is active.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
+// Minimal pass-through fetch handler. Required for installability; we don't cache
+// anything (the app needs the network), we just let requests go through.
+self.addEventListener("fetch", () => {});
+
 self.addEventListener("push", (event) => {
   let data = {};
   try {

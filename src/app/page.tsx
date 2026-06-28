@@ -164,8 +164,8 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-orange-50/40 via-rose-50/30 to-violet-50/40">
-      <main className="relative w-full max-w-md">
+    <div className="flex min-h-screen flex-col p-4 bg-gradient-to-b from-orange-50/40 via-rose-50/30 to-violet-50/40">
+      <main className="relative m-auto w-full max-w-md">
         <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-200 rounded-full opacity-30 blur-2xl" />
         <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-violet-200 rounded-full opacity-30 blur-2xl" />
 
