@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getTimeInTimezone } from "./timezone";
 
 export interface MapPerson {
@@ -19,12 +19,38 @@ const OFFLINE_COLOR = "#ef4444"; // red-500
 // "Liquid glass" surface for the floating cards on the map: translucent, heavily
 // blurred + saturated so the map shimmers through, with a bright top edge
 // highlight and a soft drop shadow for depth.
+// Base surface: near-clear, lightly blurred + saturated. The bright rim +
+// specular highlight and the real refraction come from GlassCard's layers.
 const GLASS =
-  "bg-white/5 backdrop-blur-[3px] backdrop-saturate-150 ring-1 ring-white/60 " +
-  "shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-6px_12px_-8px_rgba(255,255,255,0.35),0_6px_20px_-6px_rgba(31,38,135,0.35)]";
+  "bg-white/8 backdrop-blur-[2px] backdrop-saturate-150 ring-1 ring-white/50 " +
+  "shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-6px_14px_-10px_rgba(255,255,255,0.45),0_10px_26px_-8px_rgba(31,38,135,0.4)]";
 
-// Faint white halo so dark label text stays legible over the near-clear glass.
-const GLASS_TEXT = "[text-shadow:0_1px_2px_rgba(255,255,255,0.7)]";
+// Centered (no-offset) white glow so dark label text stays legible over the
+// near-clear glass without looking doubled.
+const GLASS_TEXT = "[text-shadow:0_0_3px_rgba(255,255,255,0.9)]";
+
+// A real "Apple liquid glass" card: the base translucent surface, an SVG
+// displacement layer that warps the map behind the edges (refraction), and a
+// glossy specular sheen along the top. Content is rendered above all layers.
+function GlassCard({ className = "", children }: { className?: string; children: ReactNode }) {
+  return (
+    <div className={`relative isolate overflow-hidden ${GLASS} ${GLASS_TEXT} ${className}`}>
+      {/* Liquid refraction of the map behind the glass (Chromium; degrades to the
+          base blur elsewhere). Sits BEHIND the text (-z-10) so it warps only the
+          map, never the label. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] [backdrop-filter:url(#liquid-glass)] [-webkit-backdrop-filter:url(#liquid-glass)]"
+      />
+      {/* Glossy specular sheen catching light along the top edge. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-1/2 rounded-[inherit] bg-gradient-to-b from-white/40 to-transparent"
+      />
+      {children}
+    </div>
+  );
+}
 
 // Equirectangular grid resolution
 const GRID_COLS = 168;
@@ -335,6 +361,36 @@ export default function WorldMap({
         className="w-full block"
       />
 
+      {/* Displacement filter that warps the backdrop for the liquid-glass cards. */}
+      <svg aria-hidden width="0" height="0" className="absolute h-0 w-0">
+        <defs>
+          <filter
+            id="liquid-glass"
+            x="-30%"
+            y="-30%"
+            width="160%"
+            height="160%"
+            colorInterpolationFilters="sRGB"
+          >
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.012 0.014"
+              numOctaves={2}
+              seed={7}
+              result="noise"
+            />
+            <feGaussianBlur in="noise" stdDeviation="1.2" result="soft" />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="soft"
+              scale={16}
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+        </defs>
+      </svg>
+
       {/* Cluster labels — hidden in compact mode (too cramped) */}
       {!compact && clusters.map((c) => {
         const x = ((c.lon + 180) / 360) * 100;
@@ -362,7 +418,7 @@ export default function WorldMap({
             style={posStyle}
           >
             {multi ? (
-              <span className={`flex flex-col gap-1 px-2.5 py-1.5 rounded-2xl ${GLASS} ${GLASS_TEXT}`}>
+              <GlassCard className="flex flex-col gap-1 px-2.5 py-1.5 rounded-2xl">
                 <span className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-gray-700">
                     {c.flag ? `${c.flag} ` : ""}
@@ -387,10 +443,10 @@ export default function WorldMap({
                     <span className="text-xs font-medium text-gray-600">{m.name}</span>
                   </span>
                 ))}
-              </span>
+              </GlassCard>
             ) : (
               <>
-                <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${GLASS} ${GLASS_TEXT}`}>
+                <GlassCard className="flex items-center gap-1.5 px-2.5 py-1 rounded-full">
                   <span
                     className="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-white"
                     style={{ backgroundColor: c.members[0].online ? ONLINE_COLOR : OFFLINE_COLOR }}
@@ -400,7 +456,7 @@ export default function WorldMap({
                     {c.members[0].name}
                   </span>
                   <span className="text-[11px] text-gray-400 tabular-nums">{time}</span>
-                </span>
+                </GlassCard>
                 <span
                   className={`text-xl leading-none select-none ${
                     isDay
@@ -418,7 +474,7 @@ export default function WorldMap({
 
       {/* Legend — green = online, red = offline */}
       {!compact && (
-        <div className={`absolute bottom-2 left-2 flex items-center gap-2.5 rounded-full px-2.5 py-1 ${GLASS} ${GLASS_TEXT}`}>
+        <GlassCard className="absolute bottom-2 left-2 flex items-center gap-2.5 rounded-full px-2.5 py-1">
           <span className="flex items-center gap-1 text-[10px] font-medium text-gray-500">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ONLINE_COLOR }} />
             online
@@ -427,7 +483,7 @@ export default function WorldMap({
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: OFFLINE_COLOR }} />
             offline
           </span>
-        </div>
+        </GlassCard>
       )}
     </div>
   );
