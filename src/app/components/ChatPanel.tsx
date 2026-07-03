@@ -404,15 +404,13 @@ export default function ChatPanel() {
         : [...prev, name]
     );
 
-  // When switching conversations while the planner or multi-recipient picker is
-  // left open, re-seed the selection to the new person — otherwise the previous
-  // person's selection stays active, which is confusing (you're now chatting with
-  // someone else but the old invitee is still ticked).
+  // Switching conversations closes the planner and the multi-recipient picker —
+  // each conversation starts fresh (you may just want to write a message here,
+  // not carry over a half-planned meeting from the previous person). Re-opening
+  // the calendar then pre-selects the current person again.
   useEffect(() => {
-    if (!selected) return;
-    const seed = selected.type === "dm" ? [selected.name] : [];
-    if (showTimePicker) setInviteSel(seed);
-    if (multiOpen) setMsgRecipients(seed);
+    setShowTimePicker(false);
+    setMultiOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
