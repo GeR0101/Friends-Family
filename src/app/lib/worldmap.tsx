@@ -16,6 +16,16 @@ export interface MapPerson {
 const ONLINE_COLOR = "#22c55e"; // green-500
 const OFFLINE_COLOR = "#ef4444"; // red-500
 
+// "Liquid glass" surface for the floating cards on the map: translucent, heavily
+// blurred + saturated so the map shimmers through, with a bright top edge
+// highlight and a soft drop shadow for depth.
+const GLASS =
+  "bg-white/5 backdrop-blur-[3px] backdrop-saturate-150 ring-1 ring-white/60 " +
+  "shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-6px_12px_-8px_rgba(255,255,255,0.35),0_6px_20px_-6px_rgba(31,38,135,0.35)]";
+
+// Faint white halo so dark label text stays legible over the near-clear glass.
+const GLASS_TEXT = "[text-shadow:0_1px_2px_rgba(255,255,255,0.7)]";
+
 // Equirectangular grid resolution
 const GRID_COLS = 168;
 const GRID_ROWS = 78;
@@ -103,6 +113,19 @@ export default function WorldMap({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [times, setTimes] = useState<Record<string, string>>({});
   const [personDay, setPersonDay] = useState<Record<string, boolean>>({});
+  // Rendered pixel height of the map, so we can tell when a label would overflow
+  // the top edge (Austria sits high up, and on a short mobile map there isn't
+  // enough room above the marker for a tall multi-person label).
+  const [mapH, setMapH] = useState(0);
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setMapH(el.clientHeight));
+    ro.observe(el);
+    setMapH(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
 
   const peopleKey = people.map((p) => `${p.name}@${p.tz}@${p.online ? 1 : 0}`).join("|");
 
@@ -320,14 +343,26 @@ export default function WorldMap({
         const time = times[c.key] || "--:--";
         const multi = c.members.length > 1;
         const offset = multi ? 30 + c.members.length * 18 : 42;
+        // Labels normally sit above the marker. Near the top of the map (e.g.
+        // Europe/Austria) there's no room, and we don't want to cover the
+        // continent — so tuck the card to the LEFT of the marker, out over the
+        // ocean, when there's horizontal room; otherwise drop it just below.
+        const yPx = mapH > 0 ? (y / 100) * mapH : Infinity;
+        const noRoomAbove = yPx - offset < 6;
+        const placeLeft = noRoomAbove && x > 34;
+        const placeBelow = noRoomAbove && !placeLeft;
+        const posClass = placeLeft ? "-translate-y-1/2 items-center" : "-translate-x-1/2 items-start";
+        const posStyle = placeLeft
+          ? { right: `calc(${100 - x}% + 14px)`, top: `${y}%` }
+          : { left: `${x}%`, top: placeBelow ? `calc(${y}% + 16px)` : `calc(${y}% - ${offset}px)` };
         return (
           <div
             key={c.key}
-            className="absolute -translate-x-1/2 flex items-start gap-1.5 whitespace-nowrap pointer-events-none"
-            style={{ left: `${x}%`, top: `calc(${y}% - ${offset}px)` }}
+            className={`absolute flex gap-1.5 whitespace-nowrap pointer-events-none ${posClass}`}
+            style={posStyle}
           >
             {multi ? (
-              <span className="flex flex-col gap-1 px-2.5 py-1.5 rounded-2xl bg-white/90 backdrop-blur-sm shadow-sm ring-1 ring-black/5">
+              <span className={`flex flex-col gap-1 px-2.5 py-1.5 rounded-2xl ${GLASS} ${GLASS_TEXT}`}>
                 <span className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-gray-700">
                     {c.flag ? `${c.flag} ` : ""}
@@ -355,7 +390,7 @@ export default function WorldMap({
               </span>
             ) : (
               <>
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-sm shadow-sm ring-1 ring-black/5">
+                <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${GLASS} ${GLASS_TEXT}`}>
                   <span
                     className="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-white"
                     style={{ backgroundColor: c.members[0].online ? ONLINE_COLOR : OFFLINE_COLOR }}
@@ -383,7 +418,7 @@ export default function WorldMap({
 
       {/* Legend — green = online, red = offline */}
       {!compact && (
-        <div className="absolute bottom-2 left-2 flex items-center gap-2.5 rounded-full bg-white/85 backdrop-blur-sm px-2.5 py-1 shadow-sm ring-1 ring-black/5">
+        <div className={`absolute bottom-2 left-2 flex items-center gap-2.5 rounded-full px-2.5 py-1 ${GLASS} ${GLASS_TEXT}`}>
           <span className="flex items-center gap-1 text-[10px] font-medium text-gray-500">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ONLINE_COLOR }} />
             online

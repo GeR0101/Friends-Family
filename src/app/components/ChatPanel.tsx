@@ -404,6 +404,18 @@ export default function ChatPanel() {
         : [...prev, name]
     );
 
+  // When switching conversations while the planner or multi-recipient picker is
+  // left open, re-seed the selection to the new person — otherwise the previous
+  // person's selection stays active, which is confusing (you're now chatting with
+  // someone else but the old invitee is still ticked).
+  useEffect(() => {
+    if (!selected) return;
+    const seed = selected.type === "dm" ? [selected.name] : [];
+    if (showTimePicker) setInviteSel(seed);
+    if (multiOpen) setMsgRecipients(seed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
   // Send the same message into each recipient's direct chat (no group thread).
   // The full audience is tagged on every copy so each DM can show "auch an …"
   // and offer reply-all.
