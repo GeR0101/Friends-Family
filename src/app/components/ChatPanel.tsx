@@ -217,6 +217,17 @@ function PersonTimeRow({
   );
 }
 
+// A small curated set for the quick emoji picker in the chat input.
+const EMOJIS = [
+  "😀", "😄", "😍", "🥰", "😘", "😊", "😎", "🤩",
+  "😂", "🤣", "😅", "😉", "🙃", "😴", "🤔", "😇",
+  "😢", "😭", "😡", "🥳", "😱", "🤗", "🤪", "😜",
+  "👍", "👎", "👏", "🙌", "🙏", "💪", "👋", "🤝",
+  "❤️", "🧡", "💛", "💚", "💙", "💜", "🔥", "✨",
+  "🎉", "🎂", "🍕", "☕", "🍺", "🌴", "☀️", "🌙",
+  "✈️", "🏖️", "📷", "🎵", "⚽", "🚗", "🏠", "💯",
+];
+
 export default function ChatPanel() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -238,11 +249,27 @@ export default function ChatPanel() {
   const [selectedTime, setSelectedTime] = useState("18:00");
   const [planMode, setPlanMode] = useState<"now" | "later">("later");
   const [sending, setSending] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [, setTick] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const prevConvRef = useRef<string | null>(null);
+
+  // Insert an emoji at the current caret position (append if the textarea isn't
+  // focused), then restore the caret just after it.
+  const insertEmoji = (emoji: string) => {
+    const ta = inputRef.current;
+    const start = ta?.selectionStart ?? input.length;
+    const end = ta?.selectionEnd ?? input.length;
+    setInput((v) => v.slice(0, start) + emoji + v.slice(end));
+    requestAnimationFrame(() => {
+      if (!ta) return;
+      ta.focus();
+      const pos = start + emoji.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  };
   const prevLastIdRef = useRef<string | null>(null);
   const hadSelectionRef = useRef(false);
 
@@ -411,6 +438,7 @@ export default function ChatPanel() {
   useEffect(() => {
     setShowTimePicker(false);
     setMultiOpen(false);
+    setEmojiOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
@@ -1478,7 +1506,7 @@ export default function ChatPanel() {
                     </p>
                   </div>
                 )}
-                <div className="flex items-end gap-2">
+                <div className="flex items-end gap-1">
                   <button
                     onClick={() => {
                       const opening = !showTimePicker;
@@ -1488,7 +1516,7 @@ export default function ChatPanel() {
                         setInviteSel(selected.type === "dm" ? [selected.name] : []);
                       }
                     }}
-                    className={`p-2.5 rounded-xl transition-all flex-shrink-0 ${
+                    className={`p-2 rounded-xl transition-all flex-shrink-0 ${
                       showTimePicker
                         ? "bg-violet-100 text-violet-600"
                         : "text-gray-400 hover:text-violet-500 hover:bg-violet-50"
@@ -1513,7 +1541,7 @@ export default function ChatPanel() {
                         setMsgRecipients(selected.type === "dm" ? [selected.name] : []);
                       }
                     }}
-                    className={`p-2.5 rounded-xl transition-all flex-shrink-0 ${
+                    className={`p-2 rounded-xl transition-all flex-shrink-0 ${
                       multiOpen
                         ? "bg-violet-100 text-violet-600"
                         : "text-gray-400 hover:text-violet-500 hover:bg-violet-50"
@@ -1529,14 +1557,51 @@ export default function ChatPanel() {
                       />
                     </svg>
                   </button>
-                  <textarea
-                    ref={inputRef}
-                    rows={1}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder={multiOpen ? "Nachricht an mehrere…" : "Schreib was…"}
-                    className="flex-1 min-w-0 resize-none max-h-32 px-4 py-2.5 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 bg-gray-50/60 text-gray-800 placeholder-gray-400 transition-all text-base sm:text-sm leading-snug"
-                  />
+                  <div className="relative flex-1 min-w-0">
+                    <textarea
+                      ref={inputRef}
+                      rows={1}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onPointerDown={() => setEmojiOpen(false)}
+                      placeholder={multiOpen ? "Nachricht an mehrere…" : "Schreib was…"}
+                      className="w-full resize-none max-h-32 pl-4 pr-4 sm:pr-11 py-2.5 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 bg-gray-50/60 text-gray-800 placeholder-gray-400 transition-all text-base sm:text-sm leading-snug"
+                    />
+                    {/* Emoji picker is desktop-only — on mobile the system
+                        keyboard already provides emojis. */}
+                    <button
+                      onClick={() => setEmojiOpen((o) => !o)}
+                      className={`hidden sm:block absolute bottom-1.5 right-1.5 p-1.5 rounded-lg transition-all ${
+                        emojiOpen
+                          ? "bg-violet-100 text-violet-600"
+                          : "text-gray-400 hover:text-violet-500 hover:bg-violet-50"
+                      }`}
+                      title="Emoji"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    </button>
+                    {emojiOpen && (
+                      <div className="absolute bottom-full right-0 z-30 mb-2 grid w-64 grid-cols-8 gap-0.5 rounded-2xl border border-gray-200 bg-white p-2 shadow-lg">
+                        {EMOJIS.map((e) => (
+                          <button
+                            key={e}
+                            type="button"
+                            onClick={() => insertEmoji(e)}
+                            className="rounded-lg p-1 text-xl leading-none hover:bg-gray-100"
+                          >
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={handleSend}
                     disabled={!input.trim() || sending}
