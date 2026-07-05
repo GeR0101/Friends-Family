@@ -472,18 +472,18 @@ export default function WorldMap({
         );
       })}
 
-      {/* Legend — green = online, red = offline */}
+      {/* Legend — green = online, red = offline (plain text, no pill) */}
       {!compact && (
-        <GlassCard className="absolute bottom-2 left-2 flex items-center gap-2.5 rounded-full px-2.5 py-1">
-          <span className="flex items-center gap-1 text-[10px] font-medium text-gray-500">
+        <div className="absolute bottom-2 left-3 flex items-center gap-2.5">
+          <span className="flex items-center gap-1 text-[10px] font-medium text-gray-500 [text-shadow:0_1px_2px_rgba(255,255,255,0.8)]">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ONLINE_COLOR }} />
             online
           </span>
-          <span className="flex items-center gap-1 text-[10px] font-medium text-gray-500">
+          <span className="flex items-center gap-1 text-[10px] font-medium text-gray-500 [text-shadow:0_1px_2px_rgba(255,255,255,0.8)]">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: OFFLINE_COLOR }} />
             offline
           </span>
-        </GlassCard>
+        </div>
       )}
     </div>
   );

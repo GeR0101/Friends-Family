@@ -719,7 +719,7 @@ export default function ChatPanel() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={1.8}
-                  d="M18 9v6m3-3h-6m-3-1a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                  d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
               Neuer Kontakt
@@ -814,9 +814,10 @@ export default function ChatPanel() {
               >
                 <div className="relative flex-shrink-0">
                   <Avatar name={c.name} avatar={c.avatar} className="w-12 h-12" />
-                  {c.online && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 border-2 border-white rounded-full" />
-                  )}
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-2 border-white rounded-full"
+                    style={{ backgroundColor: c.online ? "#22c55e" : "#ef4444" }}
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-gray-800 truncate">{c.name}</p>
