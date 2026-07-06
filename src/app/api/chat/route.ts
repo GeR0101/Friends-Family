@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Row } from "@libsql/client";
 import { getDb } from "@/app/lib/db";
 import { sendPushToUser } from "@/app/lib/push";
+import { unreadForUser } from "@/app/lib/reads";
 
 interface MeetingProposal {
   startsAt?: number; // absolute epoch (ms) — viewer renders in their own zone
@@ -227,9 +228,21 @@ export async function POST(req: NextRequest) {
         ? "📹 lädt dich in einen Video-Raum ein"
         : message.text;
       await Promise.all(
-        recipients.map((r) =>
-          sendPushToUser(r, { title: message.user, body, url: "/dashboard", tag: conv })
-        )
+        recipients.map(async (r) => {
+          // Include the recipient's fresh total so the app icon shows the right
+          // count even while the app is closed (the SW reads this on push).
+          let badge: number | undefined;
+          try {
+            badge = (await unreadForUser(db, r)).total;
+          } catch {}
+          return sendPushToUser(r, {
+            title: message.user,
+            body,
+            url: "/dashboard",
+            tag: conv,
+            badge,
+          });
+        })
       );
     } catch {
       // Notifications must never block sending a message.

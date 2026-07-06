@@ -250,6 +250,8 @@ export default function ChatPanel() {
   const [planMode, setPlanMode] = useState<"now" | "later">("later");
   const [sending, setSending] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  // Unread DM counts keyed by the other person's lowercased name.
+  const [unread, setUnread] = useState<Record<string, number>>({});
   const [, setTick] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -309,6 +311,36 @@ export default function ChatPanel() {
     return () => clearInterval(id);
   }, [user, loadContacts]);
 
+  // Reflect the unread total on the installed app's icon (iOS 16.4+ / Android).
+  const setAppBadge = (n: number) => {
+    try {
+      const nav = navigator as Navigator & {
+        setAppBadge?: (n?: number) => Promise<void>;
+        clearAppBadge?: () => Promise<void>;
+      };
+      if (n > 0) nav.setAppBadge?.(n);
+      else nav.clearAppBadge?.();
+    } catch {}
+  };
+
+  // Load unread counts (per contact + total) and update the app-icon badge.
+  const loadUnread = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/chat/unread?user=${encodeURIComponent(user.name)}`);
+      const data = await res.json();
+      setUnread(data.byOther || {});
+      setAppBadge(data.total || 0);
+    } catch {}
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadUnread();
+    const id = setInterval(loadUnread, 4000);
+    return () => clearInterval(id);
+  }, [user, loadUnread]);
+
   const conversationId = user && selected
     ? selected.type === "group"
       ? selected.id
@@ -332,6 +364,35 @@ export default function ChatPanel() {
     const id = setInterval(loadMessages, 2000);
     return () => clearInterval(id);
   }, [conversationId, loadMessages]);
+
+  // Opening a DM (and receiving while it's open) marks it read: clear that
+  // contact's badge optimistically, then persist so it clears on every device.
+  const markConversationRead = useCallback(async () => {
+    if (!user || !conversationId || selected?.type !== "dm") return;
+    const otherLower = selected.name.toLowerCase();
+    setUnread((prev) => {
+      if (!prev[otherLower]) return prev;
+      const next = { ...prev };
+      delete next[otherLower];
+      setAppBadge(Object.values(next).reduce((a, b) => a + b, 0));
+      return next;
+    });
+    try {
+      const res = await fetch("/api/chat/unread", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: user.name, conversationId }),
+      });
+      const data = await res.json();
+      setUnread(data.byOther || {});
+      setAppBadge(data.total || 0);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, conversationId, selected]);
+
+  useEffect(() => {
+    if (selected?.type === "dm") markConversationRead();
+  }, [selected, messages.length, markConversationRead]);
 
   const scrollToBottom = (smooth = false) => {
     const el = listRef.current;
@@ -818,9 +879,20 @@ export default function ChatPanel() {
                     className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-2 border-white rounded-full"
                     style={{ backgroundColor: c.online ? "#22c55e" : "#ef4444" }}
                   />
+                  {unread[c.name.toLowerCase()] > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-white">
+                      {unread[c.name.toLowerCase()] > 99 ? "99+" : unread[c.name.toLowerCase()]}
+                    </span>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-gray-800 truncate">{c.name}</p>
+                  <p
+                    className={`truncate text-gray-800 ${
+                      unread[c.name.toLowerCase()] > 0 ? "font-extrabold" : "font-semibold"
+                    }`}
+                  >
+                    {c.name}
+                  </p>
                   <p className="text-xs text-gray-400 truncate">
                     {c.location.flag} {c.location.name} · {getTimeInTimezone(c.location.tz)} Uhr
                   </p>

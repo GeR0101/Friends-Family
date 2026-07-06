@@ -28,7 +28,16 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/dashboard" },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  const tasks = [self.registration.showNotification(title, options)];
+  // Reflect the unread total on the app icon (iOS 16.4+ / Android installed PWA).
+  if (typeof data.badge === "number" && self.navigator && self.navigator.setAppBadge) {
+    tasks.push(
+      data.badge > 0
+        ? self.navigator.setAppBadge(data.badge).catch(() => {})
+        : self.navigator.clearAppBadge().catch(() => {})
+    );
+  }
+  event.waitUntil(Promise.all(tasks));
 });
 
 self.addEventListener("notificationclick", (event) => {

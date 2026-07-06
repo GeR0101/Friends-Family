@@ -87,6 +87,12 @@ async function ensureSchema(db: Client) {
     );
     CREATE INDEX IF NOT EXISTS idx_contacts_addr ON contacts (addressee_lower, status);
     CREATE INDEX IF NOT EXISTS idx_contacts_req ON contacts (requester_lower, status);
+    CREATE TABLE IF NOT EXISTS reads (
+      user_lower      TEXT NOT NULL,
+      conversation_id TEXT NOT NULL,
+      last_read_ts    INTEGER NOT NULL,
+      PRIMARY KEY (user_lower, conversation_id)
+    );
   `);
 
   // Add columns introduced after the initial accounts schema.

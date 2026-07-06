@@ -21,6 +21,7 @@ export interface PushPayload {
   body: string;
   url?: string; // where to go when the notification is tapped
   tag?: string; // collapses notifications with the same tag
+  badge?: number; // total unread count to show on the app icon
 }
 
 /**
