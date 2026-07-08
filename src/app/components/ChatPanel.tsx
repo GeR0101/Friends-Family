@@ -1304,7 +1304,7 @@ export default function ChatPanel() {
                         />
                       )}
                       <div className="max-w-[85%]">
-                        {!isOwn && selected.type === "group" && (
+                        {!isOwn && (
                           <p className="text-xs font-medium text-gray-500 mb-1 ml-1">{msg.user}</p>
                         )}
                         <div
