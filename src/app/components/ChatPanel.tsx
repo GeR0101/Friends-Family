@@ -1072,8 +1072,17 @@ export default function ChatPanel() {
                     const p = msg.meetingProposal;
                     const startsAt = proposalEpoch(p);
                     const myLoc = user.location;
+                    // Always include the conversation partner(s) — a 1:1 proposal
+                    // doesn't store `invitees`, so without this the proposer would
+                    // only see their own time and not the other person's.
+                    const partners =
+                      selected?.type === "dm"
+                        ? [selected.name]
+                        : selected?.type === "group"
+                        ? selected.members
+                        : [];
                     const involved = Array.from(
-                      new Set([msg.user, ...(p.invitees || []), user.name])
+                      new Set([msg.user, ...(p.invitees || []), ...partners, user.name])
                     );
                     const seen = new Set<string>([myLoc.tz]);
                     const otherRows = involved
@@ -1439,20 +1448,44 @@ export default function ChatPanel() {
                           <div className="flex flex-wrap gap-2">
                             {chips.map((epoch, i) => {
                               const isNow = i === 0 && nowOk;
+                              const others = locs.filter((l) => l.tz !== user.location.tz);
+                              const dayOf = (e: number) =>
+                                new Date(e).toLocaleDateString("en-CA", { timeZone: user.location.tz });
+                              const dayTop = isNow
+                                ? "Jetzt"
+                                : dayOf(epoch) === dayOf(Date.now())
+                                ? "Heute"
+                                : dayOf(epoch) === dayOf(Date.now() + 86400000)
+                                ? "Morgen"
+                                : new Date(epoch).toLocaleDateString("de-DE", {
+                                    timeZone: user.location.tz,
+                                    weekday: "short",
+                                  });
                               return (
                                 <button
                                   key={epoch}
                                   type="button"
                                   disabled={sending}
                                   onClick={() => (isNow ? proposeNow() : proposeMeeting(epoch))}
-                                  className={`flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 ${
-                                    isNow
-                                      ? "bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
-                                      : "bg-violet-500 hover:bg-violet-600"
+                                  className={`flex flex-col items-stretch overflow-hidden rounded-2xl text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 ${
+                                    isNow ? "bg-gradient-to-r from-emerald-500 to-green-500" : "bg-violet-500 hover:bg-violet-600"
                                   }`}
                                 >
-                                  {isNow && <span className="h-2 w-2 animate-pulse rounded-full bg-white" />}
-                                  {slotLabel(epoch, user.location.tz)}
+                                  <span className="flex items-center justify-center gap-1 px-3 pt-1.5 text-[11px] font-medium text-white/85">
+                                    {isNow && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />}
+                                    {dayTop}
+                                  </span>
+                                  {/* Split pill: your time | the other side's time */}
+                                  <span className="flex items-stretch divide-x divide-white/25 px-1 pb-1.5 text-sm font-bold">
+                                    <span className="flex items-center gap-1 px-2">
+                                      {user.location.flag} {timeAtEpoch(epoch, user.location.tz)}
+                                    </span>
+                                    {others.map((l) => (
+                                      <span key={l.tz} className="flex items-center gap-1 px-2">
+                                        {l.flag} {timeAtEpoch(epoch, l.tz)}
+                                      </span>
+                                    ))}
+                                  </span>
                                 </button>
                               );
                             })}
