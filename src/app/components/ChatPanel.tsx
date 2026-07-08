@@ -189,6 +189,68 @@ function AwakeBar({ ok, asleepNames }: { ok: boolean; asleepNames: string[] }) {
   );
 }
 
+// ── Meeting slot suggestions ────────────────────────────────────────────────
+function everyoneAwakeAt(epoch: number, locs: Location[]): boolean {
+  return locs.every((l) => isAwakeHour(hourAtEpoch(epoch, l.tz)));
+}
+
+// A few round-hour slots (in the proposer's zone) over the next week where
+// everyone is awake. The app already knows this — so it offers the answer
+// instead of making you guess with a stepper.
+function suggestSlots(myTz: string, locs: Location[], max = 4): number[] {
+  const now = Date.now();
+  const hours = [9, 12, 15, 18, 20];
+  const picks: number[] = [];
+  for (let day = 0; day < 7 && picks.length < max; day++) {
+    const dateStr = new Date(now + day * 86400000).toLocaleDateString("en-CA", { timeZone: myTz });
+    for (const h of hours) {
+      if (picks.length >= max) break;
+      const epoch = zonedToEpoch(`${dateStr}T${String(h).padStart(2, "0")}:00`, myTz);
+      if (!Number.isFinite(epoch) || epoch < now + 5 * 60000) continue;
+      if (everyoneAwakeAt(epoch, locs)) picks.push(epoch);
+    }
+  }
+  return picks;
+}
+
+// The next 30-min-aligned instant from `from` when everyone is awake — powers the
+// "Ab HH:MM passt es für alle" nudge when a manually chosen time doesn't fit.
+function nextAllAwake(from: number, locs: Location[]): number | null {
+  const step = 30 * 60000;
+  let t = Math.ceil(from / step) * step;
+  const end = from + 7 * 86400000;
+  while (t <= end) {
+    if (everyoneAwakeAt(t, locs)) return t;
+    t += step;
+  }
+  return null;
+}
+
+// "Jetzt" / "Heute 18:00" / "Morgen 09:00" / "Sa 20:00", in the proposer's zone.
+function slotLabel(epoch: number, myTz: string): string {
+  const now = Date.now();
+  if (epoch <= now + 60000) return "Jetzt";
+  const dayOf = (e: number) => new Date(e).toLocaleDateString("en-CA", { timeZone: myTz });
+  const d = dayOf(epoch);
+  const hhmm = timeAtEpoch(epoch, myTz);
+  const prefix =
+    d === dayOf(now)
+      ? "Heute"
+      : d === dayOf(now + 86400000)
+      ? "Morgen"
+      : new Date(epoch).toLocaleDateString("de-DE", { timeZone: myTz, weekday: "short" });
+  return `${prefix} ${hhmm}`;
+}
+
+// Distinct timezones among the given people (used so a shared spot isn't checked
+// twice and the preview lists each zone once).
+function uniqueLocs(locs: Location[]): Location[] {
+  const seen = new Set<string>();
+  const out: Location[] = [];
+  for (const l of locs) if (!seen.has(l.tz)) (seen.add(l.tz), out.push(l));
+  return out;
+}
+
 // One reusable "face · local time · place · day/night" row — used in the planner
 // preview and in every meeting card, so the visual language stays identical.
 function PersonTimeRow({
@@ -247,7 +309,7 @@ export default function ChatPanel() {
     return tomorrow.toISOString().split("T")[0];
   });
   const [selectedTime, setSelectedTime] = useState("18:00");
-  const [planMode, setPlanMode] = useState<"now" | "later">("later");
+  const [manualOpen, setManualOpen] = useState(false); // custom time fallback
   const [sending, setSending] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   // Unread DM counts keyed by the other person's lowercased name.
@@ -1239,7 +1301,7 @@ export default function ChatPanel() {
                         <div
                           className={`rounded-2xl px-4 py-2.5 ${
                             isOwn
-                              ? "bg-gradient-to-r from-pink-500 to-violet-500 text-white rounded-br-md"
+                              ? "bg-violet-500 text-white rounded-br-md"
                               : "bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm"
                           }`}
                         >
@@ -1294,7 +1356,7 @@ export default function ChatPanel() {
 
               {/* Time picker */}
               {showTimePicker && (
-                <div className="bg-white border-t border-gray-100 px-4 py-4">
+                <div className="max-h-[70vh] overflow-y-auto bg-white border-t border-gray-100 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                   <div className="mb-4 flex items-center justify-between">
                     <h3 className="font-semibold text-gray-800">Treffen vorschlagen</h3>
                     <button
@@ -1308,22 +1370,7 @@ export default function ChatPanel() {
                     </button>
                   </div>
 
-                  {/* Jetzt / Später — first decision, one toggle instead of two buttons */}
-                  <div className="mb-4 flex rounded-full bg-gray-100 p-1">
-                    {(["now", "later"] as const).map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => setPlanMode(m)}
-                        className={`flex-1 rounded-full py-2 text-sm font-medium transition-all ${
-                          planMode === m ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
-                        }`}
-                      >
-                        {m === "now" ? "Jetzt sofort" : "Später planen"}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Mit wem? */}
+                  {/* Mit wem? — larger tap target on the add/remove toggle */}
                   {otherContacts.length > 0 && (
                     <div className="mb-4">
                       <label className="mb-2 block text-xs text-gray-500">Mit wem?</label>
@@ -1337,7 +1384,7 @@ export default function ChatPanel() {
                               key={c.name}
                               type="button"
                               onClick={() => toggleInvite(c.name)}
-                              className={`flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-sm font-medium transition-all ${
+                              className={`flex items-center gap-1.5 rounded-full border py-1.5 pl-1.5 pr-3 text-sm font-medium transition-all ${
                                 on
                                   ? "border-violet-300 bg-violet-100 text-violet-700"
                                   : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
@@ -1346,19 +1393,25 @@ export default function ChatPanel() {
                               <Avatar
                                 name={c.name}
                                 avatar={c.avatar}
-                                className="h-5 w-5"
+                                className="h-6 w-6"
                                 textClassName="text-[10px]"
                               />
                               {c.name}
-                              {on ? (
-                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
-                              ) : (
-                                <svg className="h-3 w-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                                </svg>
-                              )}
+                              <span
+                                className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                                  on ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-400"
+                                }`}
+                              >
+                                {on ? (
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                ) : (
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                )}
+                              </span>
                             </button>
                           );
                         })}
@@ -1366,130 +1419,218 @@ export default function ChatPanel() {
                     </div>
                   )}
 
-                  {/* Tag + Uhrzeit — only when planning for later */}
-                  {planMode === "later" && (
-                    <div className="mb-4 flex gap-3">
-                      <div className="flex-1">
-                        <label className="mb-1 block text-xs text-gray-500">Tag</label>
-                        <select
-                          value={selectedDate}
-                          onChange={(e) => setSelectedDate(e.target.value)}
-                          className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2 text-base sm:text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
-                        >
-                          {Array.from({ length: 7 }, (_, i) => {
-                            const d = new Date();
-                            d.setDate(d.getDate() + i);
-                            const val = d.toISOString().split("T")[0];
-                            const label =
-                              i === 0
-                                ? "Heute"
-                                : i === 1
-                                ? "Morgen"
-                                : d.toLocaleDateString("de-DE", {
-                                    weekday: "long",
-                                    day: "numeric",
-                                    month: "numeric",
-                                  });
-                            return (
-                              <option key={val} value={val}>
-                                {label}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-gray-500">Uhrzeit</label>
-                        <div className="flex items-center gap-1">
-                          <select
-                            value={selectedTime.split(":")[0]}
-                            onChange={(e) =>
-                              setSelectedTime(`${e.target.value}:${selectedTime.split(":")[1]}`)
-                            }
-                            className="rounded-xl border border-gray-200 bg-gray-50/60 px-2.5 py-2 text-base sm:text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
-                          >
-                            {Array.from({ length: 24 }, (_, h) => {
-                              const hh = String(h).padStart(2, "0");
+                  {/* Vorschläge — the app already knows when everyone's awake, so it
+                      offers tappable slots instead of a guessing stepper. One tap sends. */}
+                  {(() => {
+                    const locs = uniqueLocs(
+                      Array.from(new Set([user.name, ...inviteSel]))
+                        .map((n) => locFor(n))
+                        .filter((l): l is Location => !!l)
+                    );
+                    const nowOk = everyoneAwakeAt(Date.now(), locs);
+                    const slots = suggestSlots(user.location.tz, locs, nowOk ? 3 : 4);
+                    const chips = nowOk ? [Date.now(), ...slots] : slots;
+                    return (
+                      <div className="mb-3">
+                        <label className="mb-2 block text-xs text-gray-500">
+                          Vorschläge <span className="text-gray-400">· alle wach</span>
+                        </label>
+                        {chips.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {chips.map((epoch, i) => {
+                              const isNow = i === 0 && nowOk;
                               return (
-                                <option key={hh} value={hh}>
-                                  {hh}
-                                </option>
+                                <button
+                                  key={epoch}
+                                  type="button"
+                                  disabled={sending}
+                                  onClick={() => (isNow ? proposeNow() : proposeMeeting(epoch))}
+                                  className={`flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 ${
+                                    isNow
+                                      ? "bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
+                                      : "bg-violet-500 hover:bg-violet-600"
+                                  }`}
+                                >
+                                  {isNow && <span className="h-2 w-2 animate-pulse rounded-full bg-white" />}
+                                  {slotLabel(epoch, user.location.tz)}
+                                </button>
                               );
                             })}
-                          </select>
-                          <span className="font-semibold text-gray-400">:</span>
-                          <select
-                            value={selectedTime.split(":")[1]}
-                            onChange={(e) =>
-                              setSelectedTime(`${selectedTime.split(":")[0]}:${e.target.value}`)
-                            }
-                            className="rounded-xl border border-gray-200 bg-gray-50/60 px-2.5 py-2 text-base sm:text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
-                          >
-                            {["00", "15", "30", "45"].map((mm) => (
-                              <option key={mm} value={mm}>
-                                {mm}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Live preview — same building block as the chat card */}
-                  {(() => {
-                    const startsAt =
-                      planMode === "now"
-                        ? Date.now()
-                        : zonedToEpoch(`${selectedDate}T${selectedTime}`, user.location.tz);
-                    const names = Array.from(new Set([user.name, ...inviteSel]));
-                    const seen = new Set<string>();
-                    const rows = names
-                      .map((n) => ({ n, loc: locFor(n), avatar: avatarFor(n) }))
-                      .filter(
-                        (x): x is { n: string; loc: Location; avatar?: string } => !!x.loc
-                      )
-                      .filter((x) => (seen.has(x.loc.tz) ? false : (seen.add(x.loc.tz), true)));
-                    const asleep = rows
-                      .map((x) => x.loc)
-                      .filter((loc) => !isAwakeHour(hourAtEpoch(startsAt, loc.tz)));
-                    const ok = asleep.length === 0;
-                    return (
-                      <div className="mb-4 space-y-2.5 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
-                        {rows.map((x) => (
-                          <PersonTimeRow
-                            key={x.loc.tz}
-                            name={x.n}
-                            avatar={x.avatar}
-                            location={x.loc}
-                            startsAt={startsAt}
-                          />
-                        ))}
-                        <AwakeBar ok={ok} asleepNames={asleep.map((l) => l.name)} />
+                          </div>
+                        ) : (
+                          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                            In den nächsten Tagen ist niemand gemeinsam wach. Wähle unten manuell eine Zeit.
+                          </p>
+                        )}
                       </div>
                     );
                   })()}
 
-                  {/* One primary action, colored by mode */}
+                  {/* Andere Zeit — manual fallback, collapsed by default */}
                   <button
-                    onClick={planMode === "now" ? proposeNow : () => proposeMeeting()}
-                    disabled={sending}
-                    className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 font-semibold text-white shadow-sm transition-all disabled:opacity-50 ${
-                      planMode === "now"
-                        ? "bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
-                        : "bg-gradient-to-r from-pink-500 to-violet-500 hover:from-pink-600 hover:to-violet-600"
-                    }`}
+                    type="button"
+                    onClick={() => setManualOpen((o) => !o)}
+                    className="flex items-center gap-1 text-xs font-medium text-violet-500"
                   >
-                    {planMode === "now" && (
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-                    )}
-                    {planMode === "now" ? "Jetzt treffen" : "Vorschlagen"}
+                    Andere Zeit wählen
+                    <svg
+                      className={`h-3.5 w-3.5 transition-transform ${manualOpen ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
+
+                  {manualOpen && (
+                    <div className="mt-3">
+                      {/* Explicit: whose time you're setting */}
+                      <label className="mb-2 block text-xs text-gray-500">
+                        Deine Zeit{" "}
+                        <span className="text-gray-400">
+                          ({user.location.flag} {user.location.name})
+                        </span>
+                      </label>
+
+                      {/* Day chips + calendar fallback */}
+                      <div className="mb-3 flex flex-wrap gap-1.5">
+                        {Array.from({ length: 6 }, (_, i) => {
+                          const at = Date.now() + i * 86400000;
+                          const val = new Date(at).toLocaleDateString("en-CA", {
+                            timeZone: user.location.tz,
+                          });
+                          const label =
+                            i === 0
+                              ? "Heute"
+                              : i === 1
+                              ? "Morgen"
+                              : new Date(at).toLocaleDateString("de-DE", {
+                                  timeZone: user.location.tz,
+                                  weekday: "short",
+                                });
+                          const active = selectedDate === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setSelectedDate(val)}
+                              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+                                active
+                                  ? "bg-violet-100 text-violet-700 ring-1 ring-violet-300"
+                                  : "bg-gray-100 text-gray-500"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                        <input
+                          type="date"
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className="rounded-full border border-gray-200 bg-gray-50/60 px-3 py-1.5 text-sm text-gray-600 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
+                        />
+                      </div>
+
+                      {/* Time */}
+                      <div className="mb-3 flex items-center gap-1">
+                        <label className="mr-2 text-xs text-gray-500">Uhrzeit</label>
+                        <select
+                          value={selectedTime.split(":")[0]}
+                          onChange={(e) => setSelectedTime(`${e.target.value}:${selectedTime.split(":")[1]}`)}
+                          className="rounded-xl border border-gray-200 bg-gray-50/60 px-2.5 py-2 text-base sm:text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
+                        >
+                          {Array.from({ length: 24 }, (_, h) => {
+                            const hh = String(h).padStart(2, "0");
+                            return (
+                              <option key={hh} value={hh}>
+                                {hh}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <span className="font-semibold text-gray-400">:</span>
+                        <select
+                          value={selectedTime.split(":")[1]}
+                          onChange={(e) => setSelectedTime(`${selectedTime.split(":")[0]}:${e.target.value}`)}
+                          className="rounded-xl border border-gray-200 bg-gray-50/60 px-2.5 py-2 text-base sm:text-sm text-gray-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-300"
+                        >
+                          {["00", "15", "30", "45"].map((mm) => (
+                            <option key={mm} value={mm}>
+                              {mm}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Preview: each person's local time + awake, with a one-tap fix */}
+                      {(() => {
+                        const startsAt = zonedToEpoch(`${selectedDate}T${selectedTime}`, user.location.tz);
+                        const seen = new Set<string>();
+                        const rows = Array.from(new Set([user.name, ...inviteSel]))
+                          .map((n) => ({ n, loc: locFor(n), avatar: avatarFor(n) }))
+                          .filter((x): x is { n: string; loc: Location; avatar?: string } => !!x.loc)
+                          .filter((x) => (seen.has(x.loc.tz) ? false : (seen.add(x.loc.tz), true)));
+                        const locs = rows.map((x) => x.loc);
+                        const asleep = locs.filter(
+                          (loc) => !isAwakeHour(hourAtEpoch(startsAt, loc.tz))
+                        );
+                        const ok = asleep.length === 0;
+                        const fix = ok ? null : nextAllAwake(startsAt, locs);
+                        return (
+                          <div className="mb-4 space-y-2.5 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+                            <p className="text-[11px] text-gray-400">
+                              {timeAtEpoch(startsAt, user.location.tz)} Uhr · deine Zeit
+                            </p>
+                            {rows.map((x) => (
+                              <PersonTimeRow
+                                key={x.loc.tz}
+                                name={x.n}
+                                avatar={x.avatar}
+                                location={x.loc}
+                                startsAt={startsAt}
+                              />
+                            ))}
+                            <AwakeBar ok={ok} asleepNames={asleep.map((l) => l.name)} />
+                            {fix && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDate(
+                                    new Date(fix).toLocaleDateString("en-CA", { timeZone: user.location.tz })
+                                  );
+                                  setSelectedTime(timeAtEpoch(fix, user.location.tz));
+                                }}
+                                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-600"
+                              >
+                                Ab {slotLabel(fix, user.location.tz)} passt es für alle
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Confirm the manual time — the one gradient action */}
+                      <button
+                        onClick={() => proposeMeeting()}
+                        disabled={sending}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 font-semibold text-white shadow-sm transition-all hover:from-pink-600 hover:to-violet-600 disabled:opacity-50"
+                      >
+                        Vorschlagen
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Input bar */}
-              <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {/* Input bar — hidden while the planner sheet is open so there
+                  aren't two competing input areas at once */}
+              <div
+                className={`bg-white border-t border-gray-100 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${
+                  showTimePicker ? "hidden" : ""
+                }`}
+              >
                 {detectedTime && convertedTime && otherLocation && (
                   <div className="mb-3">
                     <div className="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-2.5 shadow-sm">
