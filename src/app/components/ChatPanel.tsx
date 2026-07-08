@@ -1303,18 +1303,30 @@ export default function ChatPanel() {
                           textClassName="text-xs"
                         />
                       )}
-                      <div className="max-w-[85%]">
+                      <div className="max-w-[80%]">
                         {!isOwn && (
-                          <p className="text-xs font-medium text-gray-500 mb-1 ml-1">{msg.user}</p>
+                          <p className="mb-0.5 ml-1 text-[13px] font-semibold text-violet-500">
+                            {msg.user}
+                          </p>
                         )}
                         <div
-                          className={`rounded-2xl px-4 py-2.5 ${
+                          className={`rounded-[18px] px-3 py-1.5 ${
                             isOwn
-                              ? "bg-violet-500 text-white rounded-br-md"
-                              : "bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm"
+                              ? "bg-violet-500 text-white rounded-br-sm"
+                              : "bg-white text-gray-900 rounded-bl-sm shadow-sm ring-1 ring-black/[0.06]"
                           }`}
                         >
-                          <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
+                          {/* Text with the timestamp tucked bottom-right, WhatsApp-style */}
+                          <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">
+                            {msg.text}
+                            <span
+                              className={`float-right ml-3 translate-y-[7px] select-none text-[11px] leading-none ${
+                                isOwn ? "text-white/70" : "text-gray-400"
+                              }`}
+                            >
+                              {formatMessageTime(msg.timestamp)}
+                            </span>
+                          </p>
 
                           {msg.broadcast && msg.broadcast.length > 1 && (() => {
                             const others = msg.broadcast.filter(
@@ -1331,7 +1343,7 @@ export default function ChatPanel() {
                               : null;
                             return (
                               <div
-                                className={`mt-1.5 flex items-center gap-1.5 text-[11px] ${
+                                className={`clear-both mt-1 flex items-center gap-1.5 text-[11px] ${
                                   isOwn ? "text-white/70" : "text-gray-400"
                                 }`}
                               >
@@ -1350,10 +1362,6 @@ export default function ChatPanel() {
                               </div>
                             );
                           })()}
-
-                          <p className={`text-[10px] mt-1 ${isOwn ? "text-white/60" : "text-gray-400"}`}>
-                            {formatMessageTime(msg.timestamp)}
-                          </p>
                         </div>
                       </div>
                     </div>
