@@ -85,12 +85,14 @@
   * {
     @apply border-border outline-ring/50;
   }
-  html,
+  /* Leave <html> as the normal viewport scroller — putting `overflow-x` on the
+     root turns it into a scroll container (overflow-y computes to `auto`) and
+     can break vertical scrolling on Windows/Chromium. Clip horizontal drift on
+     <body> only, with `clip` (not `hidden`) so <body> doesn't become a scroll
+     container either. */
   body {
-    /* Stop horizontal drift from decorative blobs and the rubber-band /
-       multi-direction dragging on mobile. */
-    overflow-x: hidden;
-    overscroll-behavior: none;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
     max-width: 100%;
   }
   body {
