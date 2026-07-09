@@ -18,6 +18,7 @@ import {
   resolveLocation,
 } from "../lib/cities";
 import { dmId, type Selection } from "../lib/conversation";
+import { getChatBgId, bgById, BG_EVENT } from "../lib/backgrounds";
 
 interface User {
   name: string;
@@ -314,6 +315,21 @@ export default function ChatPanel() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   // Unread DM counts keyed by the other person's lowercased name.
   const [unread, setUnread] = useState<Record<string, number>>({});
+  // Chosen chat wallpaper (per device); updates live when changed in the picker.
+  const [bgId, setBgId] = useState<string | null>(null);
+  useEffect(() => {
+    setBgId(getChatBgId());
+    const onChange = (e: Event) =>
+      setBgId((e as CustomEvent).detail ?? getChatBgId());
+    const onStorage = () => setBgId(getChatBgId());
+    window.addEventListener(BG_EVENT, onChange);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(BG_EVENT, onChange);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+  const chatBg = bgById(bgId);
   const [, setTick] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -970,6 +986,17 @@ export default function ChatPanel() {
           className={`${
             selected ? "flex" : "hidden md:flex"
           } flex-col flex-1 min-w-0 bg-gradient-to-b from-orange-50/20 to-violet-50/20`}
+          style={
+            chatBg
+              ? {
+                  backgroundColor: chatBg.swatch,
+                  backgroundImage: `url(${chatBg.src})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }
+              : undefined
+          }
         >
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
