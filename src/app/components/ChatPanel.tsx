@@ -20,7 +20,6 @@ import {
 import { dmId, type Selection } from "../lib/conversation";
 import { getChatBgId, bgById, BG_EVENT } from "../lib/backgrounds";
 import { upload } from "@vercel/blob/client";
-import VideoRecorder from "./VideoRecorder";
 
 interface User {
   name: string;
@@ -570,23 +569,44 @@ export default function ChatPanel() {
     setSending(false);
   };
 
-  // ── Video messages ──
-  const [videoOpen, setVideoOpen] = useState(false);
+  // ── Video messages (recorded with the device's native camera) ──
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [pendingVideo, setPendingVideo] = useState<{ file: File; url: string } | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [videoErr, setVideoErr] = useState(false);
-  const sendVideo = async (blob: Blob, durationMs: number, mime: string) => {
-    if (!user || !conversationId) return;
-    setVideoOpen(false);
+
+  const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow picking the same file again later
+    if (!file) return;
+    setPendingVideo({ file, url: URL.createObjectURL(file) });
+  };
+
+  const cancelPendingVideo = () => {
+    if (pendingVideo) URL.revokeObjectURL(pendingVideo.url);
+    setPendingVideo(null);
+  };
+
+  const sendVideo = async () => {
+    if (!user || !conversationId || !pendingVideo) return;
+    const { file } = pendingVideo;
+    cancelPendingVideo();
     setUploadingVideo(true);
     setVideoErr(false);
     try {
-      const ext = mime.includes("mp4") ? "mp4" : "webm";
-      const file = new File([blob], `${Date.now()}.${ext}`, { type: mime });
+      // Normalise the content type (strip any ";codecs=…") so it matches the
+      // upload route's allow-list.
+      const contentType = (file.type || "video/mp4").split(";")[0];
+      const ext = contentType.includes("quicktime")
+        ? "mov"
+        : contentType.includes("webm")
+        ? "webm"
+        : "mp4";
       // Direct-to-Blob client upload (bypasses the serverless body limit).
       const { url } = await upload(
         `videos/${user.name.toLowerCase()}/${Date.now()}.${ext}`,
         file,
-        { access: "public", handleUploadUrl: "/api/upload", contentType: mime }
+        { access: "public", handleUploadUrl: "/api/upload", contentType }
       );
       await fetch("/api/chat", {
         method: "POST",
@@ -596,7 +616,7 @@ export default function ChatPanel() {
           text: "",
           timezone: user.location.tz,
           conversationId,
-          attachment: { type: "video", url, durationMs },
+          attachment: { type: "video", url },
         }),
       });
       await loadMessages();
@@ -1846,8 +1866,16 @@ export default function ChatPanel() {
                   </div>
                 )}
                 <div className="flex items-end gap-1">
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    capture="user"
+                    className="hidden"
+                    onChange={onPickVideo}
+                  />
                   <button
-                    onClick={() => setVideoOpen(true)}
+                    onClick={() => videoInputRef.current?.click()}
                     disabled={uploadingVideo}
                     className="p-2 rounded-xl transition-all flex-shrink-0 text-gray-400 hover:text-violet-500 hover:bg-violet-50 disabled:opacity-40"
                     title="Videobotschaft aufnehmen"
@@ -1980,7 +2008,48 @@ export default function ChatPanel() {
             Video konnte nicht gesendet werden
           </div>
         )}
-        {videoOpen && <VideoRecorder onClose={() => setVideoOpen(false)} onSend={sendVideo} />}
+
+        {/* Preview & send the just-recorded video */}
+        {pendingVideo && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-black">
+            <div className="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 text-white">
+              <button
+                onClick={cancelPendingVideo}
+                aria-label="Verwerfen"
+                className="p-1.5 text-white/80 hover:text-white"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <span className="text-sm font-medium">Videobotschaft</span>
+              <span className="w-9" />
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <video src={pendingVideo.url} controls playsInline autoPlay className="h-full w-full object-contain" />
+            </div>
+            <div className="flex items-center justify-center gap-6 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5">
+              <button
+                onClick={() => {
+                  cancelPendingVideo();
+                  videoInputRef.current?.click();
+                }}
+                className="rounded-full px-5 py-3 text-sm font-semibold text-white/90 hover:bg-white/10"
+              >
+                Neu aufnehmen
+              </button>
+              <button
+                onClick={sendVideo}
+                className="flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-violet-500 px-6 py-3 font-semibold text-white shadow-md"
+              >
+                Senden
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
   );
 }
