@@ -309,14 +309,23 @@ function RoomContent({ name }: { name: string }) {
           setIsJoining(false);
           boostQuality();
           sync();
-          // Show the flip button only when there's more than one camera.
+          // Show the flip button on touch devices (phones/tablets always have a
+          // front + back camera) or on any device that reports >1 camera. iOS /
+          // iPadOS often under-reports cameras via enumerateDevices, so the
+          // coarse-pointer check is what makes the button appear there.
+          const coarse =
+            typeof window !== "undefined" &&
+            typeof window.matchMedia === "function" &&
+            window.matchMedia("(pointer: coarse)").matches;
           co.enumerateDevices()
             .then(({ devices }) => {
               if (cancelled) return;
               const cams = devices.filter((d) => d.kind === "videoinput");
-              setCanSwitchCam(cams.length > 1);
+              setCanSwitchCam(cams.length > 1 || coarse);
             })
-            .catch(() => {});
+            .catch(() => {
+              if (!cancelled) setCanSwitchCam(coarse);
+            });
         })
           .on("participant-joined", sync)
           .on("participant-updated", sync)
