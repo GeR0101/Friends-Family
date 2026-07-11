@@ -188,6 +188,9 @@ function RoomContent({ name }: { name: string }) {
   const [copied, setCopied] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+  // Front/back camera switching — only shown when the device has >1 camera.
+  const [canSwitchCam, setCanSwitchCam] = useState(false);
+  const [switchingCam, setSwitchingCam] = useState(false);
   const [spotlightSwapped, setSpotlightSwapped] = useState(false);
   const [meetingStart, setMeetingStart] = useState<number | null>(null);
   const [, setNowTick] = useState(0);
@@ -306,6 +309,14 @@ function RoomContent({ name }: { name: string }) {
           setIsJoining(false);
           boostQuality();
           sync();
+          // Show the flip button only when there's more than one camera.
+          co.enumerateDevices()
+            .then(({ devices }) => {
+              if (cancelled) return;
+              const cams = devices.filter((d) => d.kind === "videoinput");
+              setCanSwitchCam(cams.length > 1);
+            })
+            .catch(() => {});
         })
           .on("participant-joined", sync)
           .on("participant-updated", sync)
@@ -347,6 +358,18 @@ function RoomContent({ name }: { name: string }) {
     const next = !co.localVideo();
     co.setLocalVideo(next);
     setCamOn(next);
+  };
+  // Flip between front and back camera (e.g. to show something).
+  const switchCam = async () => {
+    const co = callRef.current;
+    if (!co || switchingCam) return;
+    setSwitchingCam(true);
+    try {
+      await co.cycleCamera();
+    } catch {
+      // ignore — some devices/browsers don't support cycling
+    }
+    setSwitchingCam(false);
   };
 
   const copyLink = async () => {
@@ -594,6 +617,22 @@ function RoomContent({ name }: { name: string }) {
               </svg>
             )}
           </button>
+
+          {canSwitchCam && (
+            <button
+              onClick={switchCam}
+              disabled={switchingCam || !camOn}
+              aria-label="Kamera wechseln"
+              title="Kamera wechseln (vorne/hinten)"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-all hover:bg-gray-200 disabled:opacity-40"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 4v5h-5M4 20v-5h5" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 9a7 7 0 00-13-2M5 15a7 7 0 0013 2" />
+                <circle cx="12" cy="12" r="2.25" strokeWidth={1.8} />
+              </svg>
+            </button>
+          )}
 
           <button
             onClick={leave}
