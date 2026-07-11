@@ -25,6 +25,11 @@ self.addEventListener("push", (event) => {
     badge: "/icon-192.png",
     tag: data.tag || undefined,
     renotify: !!data.tag,
+    // Make it an actual "signal": play the device notification sound (not
+    // silent) and vibrate on Android. A custom sound file isn't supported by
+    // web push — the tone itself comes from the OS notification channel.
+    silent: false,
+    vibrate: [200, 100, 200],
     data: { url: data.url || "/dashboard" },
   };
 
