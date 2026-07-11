@@ -23,6 +23,13 @@ interface RoomInvite {
   url?: string;
 }
 
+interface Attachment {
+  type: "video";
+  url: string;
+  poster?: string; // still frame shown before playback
+  durationMs?: number;
+}
+
 interface Message {
   id: string;
   user: string;
@@ -35,6 +42,7 @@ interface Message {
   // Everyone this message was sent to at once (sender + recipients). Lets a DM
   // show "also sent to …" and offer reply-all, without a separate group thread.
   broadcast?: string[];
+  attachment?: Attachment; // e.g. a recorded video message
 }
 
 function generateId(): string {
@@ -61,11 +69,12 @@ function rowToMessage(r: Row): Message {
     meetingProposal: parseJson<MeetingProposal>(r.meeting_proposal),
     roomInvite: parseJson<RoomInvite>(r.room_invite),
     broadcast: parseJson<string[]>(r.broadcast),
+    attachment: parseJson<Attachment>(r.attachment),
   };
 }
 
 const SELECT =
-  "SELECT id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast FROM messages";
+  "SELECT id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast, attachment FROM messages";
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
@@ -156,16 +165,27 @@ export async function DELETE(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { user, text, timezone, meetingProposal, roomInvite, conversationId, broadcast } = body;
+    const { user, text, timezone, meetingProposal, roomInvite, conversationId, broadcast, attachment } = body;
 
-    if (!user || !text) {
-      return NextResponse.json({ error: "user and text are required" }, { status: 400 });
+    const validAttachment =
+      attachment && attachment.type === "video" && typeof attachment.url === "string"
+        ? {
+            type: "video" as const,
+            url: attachment.url,
+            poster: typeof attachment.poster === "string" ? attachment.poster : undefined,
+            durationMs: typeof attachment.durationMs === "number" ? attachment.durationMs : undefined,
+          }
+        : undefined;
+
+    // A message needs text OR an attachment (a video message has no text).
+    if (!user || (!text && !validAttachment)) {
+      return NextResponse.json({ error: "user and text or attachment are required" }, { status: 400 });
     }
 
     const message: Message = {
       id: generateId(),
       user,
-      text,
+      text: text || "",
       timezone: timezone || "austria",
       timestamp: Date.now(),
       conversationId: conversationId || "group",
@@ -180,10 +200,13 @@ export async function POST(req: NextRequest) {
     if (Array.isArray(broadcast) && broadcast.length > 1) {
       message.broadcast = broadcast;
     }
+    if (validAttachment) {
+      message.attachment = validAttachment;
+    }
 
     const db = await getDb();
     await db.execute({
-      sql: "INSERT INTO messages (id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO messages (id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast, attachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       args: [
         message.id,
         message.user,
@@ -194,6 +217,7 @@ export async function POST(req: NextRequest) {
         message.meetingProposal ? JSON.stringify(message.meetingProposal) : null,
         message.roomInvite ? JSON.stringify(message.roomInvite) : null,
         message.broadcast ? JSON.stringify(message.broadcast) : null,
+        message.attachment ? JSON.stringify(message.attachment) : null,
       ],
     });
 
@@ -226,6 +250,8 @@ export async function POST(req: NextRequest) {
         ? "📅 schlägt ein Treffen vor"
         : message.roomInvite
         ? "📹 lädt dich in einen Video-Raum ein"
+        : message.attachment
+        ? "🎥 Videobotschaft"
         : message.text;
       await Promise.all(
         recipients.map(async (r) => {

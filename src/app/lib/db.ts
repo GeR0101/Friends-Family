@@ -61,7 +61,8 @@ async function ensureSchema(db: Client) {
       conversation_id TEXT NOT NULL DEFAULT 'group',
       meeting_proposal TEXT,
       room_invite      TEXT,
-      broadcast        TEXT
+      broadcast        TEXT,
+      attachment       TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages (conversation_id, timestamp);
     CREATE TABLE IF NOT EXISTS presence (
@@ -104,10 +105,12 @@ async function ensureSchema(db: Client) {
   if (!has("security_answer_hash"))
     await db.execute("ALTER TABLE accounts ADD COLUMN security_answer_hash TEXT");
 
-  // "broadcast" (a message sent to several people at once) added after launch.
+  // "broadcast" (a message sent to several people at once) and "attachment"
+  // (a video message's stored file) added after launch.
   const mcols = await db.execute("PRAGMA table_info(messages)");
-  if (!mcols.rows.some((r) => String(r.name) === "broadcast"))
-    await db.execute("ALTER TABLE messages ADD COLUMN broadcast TEXT");
+  const hasM = (c: string) => mcols.rows.some((r) => String(r.name) === c);
+  if (!hasM("broadcast")) await db.execute("ALTER TABLE messages ADD COLUMN broadcast TEXT");
+  if (!hasM("attachment")) await db.execute("ALTER TABLE messages ADD COLUMN attachment TEXT");
 }
 
 // One-time: when the contacts feature is first introduced, connect everyone who

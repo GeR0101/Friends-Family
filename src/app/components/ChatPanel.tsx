@@ -19,6 +19,8 @@ import {
 } from "../lib/cities";
 import { dmId, type Selection } from "../lib/conversation";
 import { getChatBgId, bgById, BG_EVENT } from "../lib/backgrounds";
+import { upload } from "@vercel/blob/client";
+import VideoRecorder from "./VideoRecorder";
 
 interface User {
   name: string;
@@ -67,6 +69,13 @@ interface RoomInvite {
   url?: string;
 }
 
+interface Attachment {
+  type: "video";
+  url: string;
+  poster?: string;
+  durationMs?: number;
+}
+
 interface Message {
   id: string;
   user: string;
@@ -75,6 +84,7 @@ interface Message {
   meetingProposal?: MeetingProposal;
   roomInvite?: RoomInvite;
   broadcast?: string[];
+  attachment?: Attachment;
 }
 
 // Deterministic on-brand avatar gradient per person name.
@@ -558,6 +568,43 @@ export default function ChatPanel() {
       await loadMessages();
     } catch {}
     setSending(false);
+  };
+
+  // ── Video messages ──
+  const [videoOpen, setVideoOpen] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoErr, setVideoErr] = useState(false);
+  const sendVideo = async (blob: Blob, durationMs: number, mime: string) => {
+    if (!user || !conversationId) return;
+    setVideoOpen(false);
+    setUploadingVideo(true);
+    setVideoErr(false);
+    try {
+      const ext = mime.includes("mp4") ? "mp4" : "webm";
+      const file = new File([blob], `${Date.now()}.${ext}`, { type: mime });
+      // Direct-to-Blob client upload (bypasses the serverless body limit).
+      const { url } = await upload(
+        `videos/${user.name.toLowerCase()}/${Date.now()}.${ext}`,
+        file,
+        { access: "public", handleUploadUrl: "/api/upload", contentType: mime }
+      );
+      await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user: user.name,
+          text: "",
+          timezone: user.location.tz,
+          conversationId,
+          attachment: { type: "video", url, durationMs },
+        }),
+      });
+      await loadMessages();
+    } catch {
+      setVideoErr(true);
+      setTimeout(() => setVideoErr(false), 4000);
+    }
+    setUploadingVideo(false);
   };
 
   // ── Broadcast a message to several friends at once ──
@@ -1343,6 +1390,16 @@ export default function ChatPanel() {
                               : "bg-white text-gray-900 rounded-bl-sm shadow-sm ring-1 ring-black/[0.06]"
                           }`}
                         >
+                          {msg.attachment?.type === "video" && (
+                            <video
+                              src={msg.attachment.url}
+                              poster={msg.attachment.poster}
+                              controls
+                              playsInline
+                              preload="metadata"
+                              className="mb-1 max-h-[360px] w-full rounded-xl bg-black object-contain"
+                            />
+                          )}
                           {/* Text with the timestamp tucked bottom-right, WhatsApp-style */}
                           <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">
                             {msg.text}
@@ -1790,6 +1847,20 @@ export default function ChatPanel() {
                 )}
                 <div className="flex items-end gap-1">
                   <button
+                    onClick={() => setVideoOpen(true)}
+                    disabled={uploadingVideo}
+                    className="p-2 rounded-xl transition-all flex-shrink-0 text-gray-400 hover:text-violet-500 hover:bg-violet-50 disabled:opacity-40"
+                    title="Videobotschaft aufnehmen"
+                  >
+                    {uploadingVideo ? (
+                      <span className="block h-5 w-5 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
                     onClick={() => {
                       const opening = !showTimePicker;
                       setShowTimePicker(opening);
@@ -1903,6 +1974,13 @@ export default function ChatPanel() {
             </>
           )}
         </section>
+
+        {videoErr && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 mx-auto w-max rounded-full bg-rose-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
+            Video konnte nicht gesendet werden
+          </div>
+        )}
+        {videoOpen && <VideoRecorder onClose={() => setVideoOpen(false)} onSend={sendVideo} />}
       </div>
   );
 }
