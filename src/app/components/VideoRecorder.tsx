@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const MAX_MS = 30000; // 30 s cap for a short video message
+const MAX_MS = 20000; // 20 s cap for a short video message
 
 // Pick a recording format the browser actually supports. iOS records mp4,
 // Android/desktop Chrome records webm.
