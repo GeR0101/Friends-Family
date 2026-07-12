@@ -300,6 +300,46 @@ const EMOJIS = [
   "✈️", "🏖️", "📷", "🎵", "⚽", "🚗", "🏠", "💯",
 ];
 
+// A video message: a cream "hello tropics · video drop" card (bird on top,
+// handwritten in Caveat — the tropics.at font) that plays the clip on tap.
+function VideoBubble({ url }: { url: string }) {
+  const [started, setStarted] = useState(false);
+  if (started) {
+    return (
+      <video
+        src={url}
+        autoPlay
+        controls
+        playsInline
+        className="mb-1 max-h-[360px] w-full rounded-xl bg-[#efe2d3] object-contain"
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setStarted(true)}
+      className="mb-1 flex aspect-[3/4] w-52 max-w-full flex-col items-center justify-center gap-1.5 rounded-xl bg-[#efe2d3] px-3"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/bird-transparent.png"
+        alt=""
+        className="h-14 w-14 object-contain drop-shadow-[0_3px_5px_rgba(87,60,40,0.22)]"
+      />
+      <span className="font-[family-name:var(--font-caveat)] text-3xl leading-none text-[#c08552]">
+        hello tropics
+      </span>
+      <span className="mt-1.5 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 shadow-sm">
+        <svg className="ml-0.5 h-5 w-5 text-violet-600" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </span>
+      <span className="mt-1 text-xs font-medium uppercase tracking-wide text-[#a98d6b]">video drop</span>
+    </button>
+  );
+}
+
 export default function ChatPanel() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -1411,14 +1451,7 @@ export default function ChatPanel() {
                           }`}
                         >
                           {msg.attachment?.type === "video" && (
-                            <video
-                              src={msg.attachment.url}
-                              poster={msg.attachment.poster}
-                              controls
-                              playsInline
-                              preload="metadata"
-                              className="mb-1 max-h-[360px] w-full rounded-xl bg-black object-contain"
-                            />
+                            <VideoBubble url={msg.attachment.url} />
                           )}
                           {/* Text with the timestamp tucked bottom-right, WhatsApp-style */}
                           <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">
