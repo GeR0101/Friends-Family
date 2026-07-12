@@ -610,16 +610,41 @@ export default function ChatPanel() {
   };
 
   // ── Video messages (recorded with the device's native camera) ──
+  const MAX_VIDEO_SEC = 20; // Videobotschaften auf 20 Sekunden begrenzen
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [pendingVideo, setPendingVideo] = useState<{ file: File; url: string } | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState(false);
-  const [videoErr, setVideoErr] = useState(false);
+  const [videoErr, setVideoErr] = useState<string | null>(null);
+  const [videoHintOpen, setVideoHintOpen] = useState(false);
+
+  const flashVideoErr = (msg: string) => {
+    setVideoErr(msg);
+    setTimeout(() => setVideoErr(null), 4000);
+  };
 
   const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow picking the same file again later
     if (!file) return;
-    setPendingVideo({ file, url: URL.createObjectURL(file) });
+    const url = URL.createObjectURL(file);
+    // The native camera can't be capped while recording, so we check the
+    // finished clip's length and reject anything over MAX_VIDEO_SEC.
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.onloadedmetadata = () => {
+      const dur = probe.duration;
+      if (Number.isFinite(dur) && dur > MAX_VIDEO_SEC + 0.75) {
+        URL.revokeObjectURL(url);
+        flashVideoErr(`Video ist zu lang (${Math.round(dur)}s) – bitte max. ${MAX_VIDEO_SEC} Sekunden`);
+        return;
+      }
+      setPendingVideo({ file, url });
+    };
+    probe.onerror = () => {
+      // Duration unreadable → let it through rather than blocking the message.
+      setPendingVideo({ file, url });
+    };
+    probe.src = url;
   };
 
   const cancelPendingVideo = () => {
@@ -632,7 +657,7 @@ export default function ChatPanel() {
     const { file } = pendingVideo;
     cancelPendingVideo();
     setUploadingVideo(true);
-    setVideoErr(false);
+    setVideoErr(null);
     try {
       // Normalise the content type (strip any ";codecs=…") so it matches the
       // upload route's allow-list.
@@ -661,8 +686,7 @@ export default function ChatPanel() {
       });
       await loadMessages();
     } catch {
-      setVideoErr(true);
-      setTimeout(() => setVideoErr(false), 4000);
+      flashVideoErr("Video konnte nicht gesendet werden");
     }
     setUploadingVideo(false);
   };
@@ -1908,10 +1932,10 @@ export default function ChatPanel() {
                     onChange={onPickVideo}
                   />
                   <button
-                    onClick={() => videoInputRef.current?.click()}
+                    onClick={() => setVideoHintOpen(true)}
                     disabled={uploadingVideo}
                     className="p-2 rounded-xl transition-all flex-shrink-0 text-gray-400 hover:text-violet-500 hover:bg-violet-50 disabled:opacity-40"
-                    title="Videobotschaft aufnehmen"
+                    title="Videobotschaft aufnehmen (max. 20 Sek.)"
                   >
                     {uploadingVideo ? (
                       <span className="block h-5 w-5 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
@@ -2037,8 +2061,58 @@ export default function ChatPanel() {
         </section>
 
         {videoErr && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 mx-auto w-max rounded-full bg-rose-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
-            Video konnte nicht gesendet werden
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 mx-auto max-w-[90%] w-max rounded-full bg-rose-500 px-4 py-2 text-center text-sm font-medium text-white shadow-lg">
+            {videoErr}
+          </div>
+        )}
+
+        {/* Hint shown before the native camera opens — the recorder itself
+            can't display a limit, so we make the 20s cap clear up front. */}
+        {videoHintOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+            onClick={() => setVideoHintOpen(false)}
+          >
+            <div
+              className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/bird-transparent.png"
+                alt=""
+                className="mx-auto h-14 w-14 object-contain drop-shadow-[0_3px_5px_rgba(87,60,40,0.22)]"
+              />
+              <p className="mt-1 font-[family-name:var(--font-caveat)] text-4xl leading-none text-[#c08552]">
+                hello tropics
+              </p>
+              <p className="font-[family-name:var(--font-caveat)] text-2xl leading-tight text-[#a98d6b]">
+                video drop
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-gray-500">
+                Video-Drops sind kurz und knackig –{" "}
+                <span className="font-semibold text-gray-700 whitespace-nowrap">20 Sekunden max.</span>
+                <br />
+                Für längere Unterhaltungen machst du am besten ein Treffen aus.
+              </p>
+              <div className="mt-6 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    setVideoHintOpen(false);
+                    videoInputRef.current?.click();
+                  }}
+                  className="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 font-semibold text-white shadow-md"
+                >
+                  Kamera öffnen
+                </button>
+                <button
+                  onClick={() => setVideoHintOpen(false)}
+                  className="w-full rounded-2xl py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-50"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
