@@ -111,6 +111,15 @@ async function ensureSchema(db: Client) {
   const hasM = (c: string) => mcols.rows.some((r) => String(r.name) === c);
   if (!hasM("broadcast")) await db.execute("ALTER TABLE messages ADD COLUMN broadcast TEXT");
   if (!hasM("attachment")) await db.execute("ALTER TABLE messages ADD COLUMN attachment TEXT");
+  // "updated_at" bumps on insert AND on later edits (meeting accept/decline), so
+  // clients can poll for just what changed via ?since=… instead of the whole list.
+  if (!hasM("updated_at")) {
+    await db.execute("ALTER TABLE messages ADD COLUMN updated_at INTEGER");
+    await db.execute("UPDATE messages SET updated_at = timestamp WHERE updated_at IS NULL");
+  }
+  await db.execute(
+    "CREATE INDEX IF NOT EXISTS idx_messages_conv_updated ON messages (conversation_id, updated_at)"
+  );
 }
 
 // One-time: when the contacts feature is first introduced, connect everyone who

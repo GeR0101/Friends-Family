@@ -43,6 +43,7 @@ interface Message {
   // show "also sent to …" and offer reply-all, without a separate group thread.
   broadcast?: string[];
   attachment?: Attachment; // e.g. a recorded video message
+  updatedAt?: number; // bumps on insert + edits; drives incremental ?since polling
 }
 
 function generateId(): string {
@@ -70,27 +71,43 @@ function rowToMessage(r: Row): Message {
     roomInvite: parseJson<RoomInvite>(r.room_invite),
     broadcast: parseJson<string[]>(r.broadcast),
     attachment: parseJson<Attachment>(r.attachment),
+    updatedAt: r.updated_at == null ? Number(r.timestamp) : Number(r.updated_at),
   };
 }
 
 const SELECT =
-  "SELECT id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast, attachment FROM messages";
+  "SELECT id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast, attachment, updated_at FROM messages";
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
   const conversationId = req.nextUrl.searchParams.get("conversationId");
+  const sinceRaw = req.nextUrl.searchParams.get("since");
+  const since = sinceRaw != null && sinceRaw !== "" ? Number(sinceRaw) : null;
 
   if (conversationId) {
+    const isGroup = conversationId === "group";
     // Legacy messages without a conversationId belong to the group chat.
-    const rs =
-      conversationId === "group"
-        ? await db.execute(
-            `${SELECT} WHERE conversation_id = 'group' OR conversation_id IS NULL ORDER BY timestamp ASC LIMIT 200`
-          )
-        : await db.execute({
-            sql: `${SELECT} WHERE conversation_id = ? ORDER BY timestamp ASC LIMIT 200`,
-            args: [conversationId],
-          });
+    const convWhere = isGroup
+      ? "(conversation_id = 'group' OR conversation_id IS NULL)"
+      : "conversation_id = ?";
+    const convArgs = isGroup ? [] : [conversationId];
+
+    // Incremental poll: only rows that changed after the client's last sync.
+    // "updated_at" catches both new messages and edited ones (meeting replies),
+    // so the frequent 2-second poll returns almost nothing instead of the whole
+    // conversation each time. `since` is Number()'d and rejected if not finite.
+    if (since != null && Number.isFinite(since)) {
+      const rs = await db.execute({
+        sql: `${SELECT} WHERE ${convWhere} AND updated_at > ? ORDER BY timestamp ASC`,
+        args: [...convArgs, since],
+      });
+      return NextResponse.json({ messages: rs.rows.map(rowToMessage), incremental: true });
+    }
+
+    const rs = await db.execute({
+      sql: `${SELECT} WHERE ${convWhere} ORDER BY timestamp ASC LIMIT 200`,
+      args: convArgs,
+    });
     return NextResponse.json({ messages: rs.rows.map(rowToMessage) });
   }
 
@@ -127,15 +144,15 @@ export async function PATCH(req: NextRequest) {
       msg.meetingProposal.roomName =
         msg.meetingProposal.roomKey || `treffen-${msg.id}`;
       await db.execute({
-        sql: "UPDATE messages SET meeting_proposal = ? WHERE id = ?",
-        args: [JSON.stringify(msg.meetingProposal), msg.id],
+        sql: "UPDATE messages SET meeting_proposal = ?, updated_at = ? WHERE id = ?",
+        args: [JSON.stringify(msg.meetingProposal), Date.now(), msg.id],
       });
     } else if (action === "decline" && msg.meetingProposal.status !== "declined") {
       msg.meetingProposal.status = "declined";
       msg.meetingProposal.declinedBy = by || "jemand";
       await db.execute({
-        sql: "UPDATE messages SET meeting_proposal = ? WHERE id = ?",
-        args: [JSON.stringify(msg.meetingProposal), msg.id],
+        sql: "UPDATE messages SET meeting_proposal = ?, updated_at = ? WHERE id = ?",
+        args: [JSON.stringify(msg.meetingProposal), Date.now(), msg.id],
       });
     }
 
@@ -206,7 +223,7 @@ export async function POST(req: NextRequest) {
 
     const db = await getDb();
     await db.execute({
-      sql: "INSERT INTO messages (id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast, attachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO messages (id, user, text, timezone, timestamp, conversation_id, meeting_proposal, room_invite, broadcast, attachment, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       args: [
         message.id,
         message.user,
@@ -218,6 +235,7 @@ export async function POST(req: NextRequest) {
         message.roomInvite ? JSON.stringify(message.roomInvite) : null,
         message.broadcast ? JSON.stringify(message.broadcast) : null,
         message.attachment ? JSON.stringify(message.attachment) : null,
+        message.timestamp,
       ],
     });
 

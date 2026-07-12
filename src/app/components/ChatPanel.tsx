@@ -84,6 +84,7 @@ interface Message {
   roomInvite?: RoomInvite;
   broadcast?: string[];
   attachment?: Attachment;
+  updatedAt?: number;
 }
 
 // Deterministic on-brand avatar gradient per person name.
@@ -401,6 +402,11 @@ export default function ChatPanel() {
   };
   const prevLastIdRef = useRef<string | null>(null);
   const hadSelectionRef = useRef(false);
+  // Newest updated_at we've seen — the cursor for incremental (?since) polling.
+  const lastSyncRef = useRef(0);
+  // Counts polls so we can do an occasional full reload to catch deletions
+  // (a cancelled meeting removes a message, which ?since can't report).
+  const pollCountRef = useRef(0);
 
   // Load user
   useEffect(() => {
@@ -474,21 +480,58 @@ export default function ChatPanel() {
       : dmId(user.name, selected.name)
     : null;
 
-  // Load + poll messages for the active conversation
-  const loadMessages = useCallback(async () => {
-    if (!conversationId) return;
-    try {
-      const res = await fetch(`/api/chat?conversationId=${encodeURIComponent(conversationId)}`);
-      const data = await res.json();
-      setMessages(data.messages || []);
-    } catch {}
-  }, [conversationId]);
+  // Load + poll messages for the active conversation.
+  //
+  // Only the first load (and an occasional reconciliation) fetches the whole
+  // conversation. Every other poll asks for just what changed since our last
+  // sync (?since=…), so the frequent 2-second poll usually returns an empty
+  // list instead of up to 200 messages — that's what was eating Origin Transfer.
+  const loadMessages = useCallback(
+    async (full = false) => {
+      if (!conversationId) return;
+      const incremental = !full && lastSyncRef.current > 0;
+      const base = `/api/chat?conversationId=${encodeURIComponent(conversationId)}`;
+      const url = incremental ? `${base}&since=${lastSyncRef.current}` : base;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const incoming: Message[] = data.messages || [];
+        const bump = (list: Message[]) => {
+          for (const m of list) {
+            const u = m.updatedAt ?? m.timestamp;
+            if (u > lastSyncRef.current) lastSyncRef.current = u;
+          }
+        };
+        if (incremental) {
+          if (incoming.length) {
+            setMessages((prev) => {
+              const byId = new Map(prev.map((m) => [m.id, m]));
+              for (const m of incoming) byId.set(m.id, m); // append new / replace edited
+              return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp);
+            });
+            bump(incoming);
+          }
+        } else {
+          setMessages(incoming);
+          lastSyncRef.current = 0;
+          bump(incoming);
+        }
+      } catch {}
+    },
+    [conversationId]
+  );
 
   useEffect(() => {
     if (!conversationId) return;
     setMessages([]);
-    loadMessages();
-    const id = setInterval(loadMessages, 2000);
+    lastSyncRef.current = 0;
+    pollCountRef.current = 0;
+    loadMessages(true);
+    const id = setInterval(() => {
+      pollCountRef.current += 1;
+      // Full reconcile roughly every 30s (every 15th poll) to pick up deletions.
+      loadMessages(pollCountRef.current % 15 === 0);
+    }, 2000);
     return () => clearInterval(id);
   }, [conversationId, loadMessages]);
 
