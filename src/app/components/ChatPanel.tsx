@@ -529,9 +529,9 @@ export default function ChatPanel() {
     loadMessages(true);
     const id = setInterval(() => {
       pollCountRef.current += 1;
-      // Full reconcile roughly every 30s (every 15th poll) to pick up deletions.
-      loadMessages(pollCountRef.current % 15 === 0);
-    }, 2000);
+      // Full reconcile roughly every 30s (every 6th poll) to pick up deletions.
+      loadMessages(pollCountRef.current % 6 === 0);
+    }, 5000);
     return () => clearInterval(id);
   }, [conversationId, loadMessages]);
 
