@@ -76,15 +76,22 @@ function VideoTile({
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    el.srcObject = videoTrack ? new MediaStream([videoTrack]) : null;
-    // Re-trigger playback — needed when the camera is toggled back on or the
-    // element remounts (mobile browsers don't always auto-resume).
-    if (videoTrack) el.play().catch(() => {});
+    if (!videoTrack) {
+      el.srcObject = null;
+      return;
+    }
+    el.srcObject = new MediaStream([videoTrack]);
+    const play = () => el.play().catch(() => {});
+    play();
+    // Toggling the camera off/on keeps the SAME persistent track (Daily just
+    // mutes it), so the reference doesn't change and this effect won't re-run.
+    // Re-attaching on "unmute" — plus a late "loadedmetadata" nudge for mobile —
+    // is what makes the picture come back instead of staying black.
+    videoTrack.addEventListener("unmute", play);
+    el.addEventListener("loadedmetadata", play);
     return () => {
-      try {
-        el.pause();
-        el.srcObject = null;
-      } catch {}
+      videoTrack.removeEventListener("unmute", play);
+      el.removeEventListener("loadedmetadata", play);
     };
   }, [videoTrack]);
 
@@ -121,16 +128,18 @@ function VideoTile({
 
   return (
     <div className={containerCls}>
-      {videoOn ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ transform: isLocal ? "scaleX(-1)" : undefined }}
-        />
-      ) : (
+      {/* The video element stays mounted even when the camera is off, so
+          toggling it back on just reveals the (re-playing) stream instead of
+          re-mounting — that remount race is what left the tile black before. */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isLocal}
+        className={`absolute inset-0 h-full w-full object-cover ${videoOn ? "" : "opacity-0"}`}
+        style={{ transform: isLocal ? "scaleX(-1)" : undefined }}
+      />
+      {!videoOn && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-violet-50/10 to-pink-50/5">
           <div
             className={`flex items-center justify-center rounded-full bg-gradient-to-br ${tileGradient(
