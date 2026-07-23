@@ -569,9 +569,33 @@ export default function ChatPanel() {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
   };
 
-  // Scroll handling: jump straight to the newest message when a conversation
-  // opens, and again when I send one myself. Incoming messages never move the
-  // view — so reading older messages stays calm (no auto-scroll on polling).
+  // Whether the view should stay pinned to the newest post. Stays true until
+  // the reader deliberately scrolls up to look at older messages.
+  const stickToBottomRef = useRef(true);
+
+  const handleListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.clientHeight - el.scrollTop < 80;
+  };
+
+  // Re-pin to the bottom whenever the content grows. Avatars, video cards and
+  // the wallpaper finish loading well after the initial scroll, which used to
+  // strand the view above the last post — and a later poll could then snap it
+  // back to that stale spot. Watching the content size fixes both.
+  useEffect(() => {
+    const el = listRef.current;
+    const content = el?.firstElementChild;
+    if (!el || !content) return;
+    const ro = new ResizeObserver(() => {
+      if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [conversationId]);
+
+  // Jump to the newest message when a conversation opens, and follow new posts
+  // while the reader is already at the bottom (their own always pull down).
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last) {
@@ -582,18 +606,16 @@ export default function ChatPanel() {
     if (convChanged) {
       prevConvRef.current = conversationId;
       prevLastIdRef.current = last.id;
-      // Run a couple of times so late-loading content (avatars, cards) doesn't
-      // leave us stranded mid-feed.
-      requestAnimationFrame(() => scrollToBottom());
-      setTimeout(() => scrollToBottom(), 120);
-      setTimeout(() => scrollToBottom(), 350);
+      stickToBottomRef.current = true;
+      scrollToBottom();
       return;
     }
     const isNew = last.id !== prevLastIdRef.current;
-    if (isNew && last.user === user?.name) {
-      scrollToBottom(true);
-    }
     prevLastIdRef.current = last.id;
+    if (!isNew) return;
+    const isMine = last.user === user?.name;
+    if (isMine) stickToBottomRef.current = true;
+    if (stickToBottomRef.current) scrollToBottom(isMine);
   }, [messages, conversationId, user]);
 
   // Grow the message box with its content (and shrink back after sending).
@@ -1255,7 +1277,7 @@ export default function ChatPanel() {
               </div>
 
               {/* Messages */}
-              <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4">
+              <div ref={listRef} onScroll={handleListScroll} className="flex-1 overflow-y-auto px-4 py-4">
                 <div className="mx-auto max-w-lg space-y-3">
                 {messages.length === 0 && (
                   <div className="text-center py-12">
