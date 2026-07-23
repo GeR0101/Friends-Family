@@ -305,15 +305,50 @@ const EMOJIS = [
 // handwritten in Caveat — the tropics.at font) that plays the clip on tap.
 function VideoBubble({ url }: { url: string }) {
   const [started, setStarted] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const vidRef = useRef<HTMLVideoElement>(null);
+
   if (started) {
+    // No native `controls`: on phones they overlay a dark bar that lingers far
+    // longer than a 20-second clip needs. Tap toggles play/pause instead, and a
+    // replay button only appears once the clip has finished.
     return (
-      <video
-        src={url}
-        autoPlay
-        controls
-        playsInline
-        className="mb-1 max-h-[360px] w-full rounded-xl bg-[#efe2d3] object-contain"
-      />
+      <div className="relative mb-1 w-full">
+        <video
+          ref={vidRef}
+          src={url}
+          autoPlay
+          playsInline
+          onEnded={() => setEnded(true)}
+          onPlay={() => setEnded(false)}
+          onClick={() => {
+            const v = vidRef.current;
+            if (!v) return;
+            if (v.paused) v.play().catch(() => {});
+            else v.pause();
+          }}
+          className="max-h-[360px] w-full rounded-xl bg-[#efe2d3] object-contain"
+        />
+        {ended && (
+          <button
+            type="button"
+            aria-label="Nochmal abspielen"
+            onClick={() => {
+              const v = vidRef.current;
+              if (!v) return;
+              v.currentTime = 0;
+              v.play().catch(() => {});
+            }}
+            className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 shadow-sm">
+              <svg className="h-5 w-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </span>
+          </button>
+        )}
+      </div>
     );
   }
   return (
