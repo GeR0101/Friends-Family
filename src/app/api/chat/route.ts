@@ -104,15 +104,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ messages: rs.rows.map(rowToMessage), incremental: true });
     }
 
+    // Take the NEWEST 200 (DESC + reverse), not the oldest — otherwise a long
+    // conversation would open on ancient history, and every full reconcile
+    // would discard the recent messages the incremental poll had added.
     const rs = await db.execute({
-      sql: `${SELECT} WHERE ${convWhere} ORDER BY timestamp ASC LIMIT 200`,
+      sql: `${SELECT} WHERE ${convWhere} ORDER BY timestamp DESC LIMIT 200`,
       args: convArgs,
     });
-    return NextResponse.json({ messages: rs.rows.map(rowToMessage) });
+    return NextResponse.json({ messages: rs.rows.map(rowToMessage).reverse() });
   }
 
-  const rs = await db.execute(`${SELECT} ORDER BY timestamp ASC LIMIT 200`);
-  return NextResponse.json({ messages: rs.rows.map(rowToMessage) });
+  const rs = await db.execute(`${SELECT} ORDER BY timestamp DESC LIMIT 200`);
+  return NextResponse.json({ messages: rs.rows.map(rowToMessage).reverse() });
 }
 
 export async function PATCH(req: NextRequest) {
